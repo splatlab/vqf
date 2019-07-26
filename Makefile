@@ -39,10 +39,12 @@ LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lm -lz -lrt
 all: $(TARGETS)
 
 # dependencies between programs and .o files
-main:							$(OBJDIR)/main.o
+main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o
 
 # dependencies between .o files and .cc (or .c) files
-$(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc \
+$(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
+
+$(OBJDIR)/ququ_filter.o: 			$(LOC_SRC)/ququ_filter.c
 
 #
 # generic build rules
