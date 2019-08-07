@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 	}
 	uint64_t qbits = atoi(argv[1]);
 	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 75*nslots/100;
+	uint64_t nvals = 90*nslots/100;
 	uint64_t *vals;
 
 	ququ_filter filter;	
@@ -58,8 +58,8 @@ int main(int argc, char **argv)
 	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = rand() % filter.metadata->range;
-		//vals[i] = (1 * vals[i]) % filter.metadata->range;
+		//vals[i] = rand() % filter.metadata->range;
+		vals[i] = (1 * vals[i]) % filter.metadata->range;
 	}
 
 	struct timeval start, end;
