@@ -175,16 +175,15 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 	}
 }
 
+
 __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
-	__uint128_t updated_md = md;
-	if (!bit) {
-		__uint128_t mask = 1ULL << index;
-		updated_md = updated_md & ~mask;
-	} else {
-		__uint128_t mask = 1ULL << index;
-		updated_md = updated_md | mask;
-	}
-	return updated_md;
+  static const __uint128_t one = 1;
+  
+  __uint128_t unshifted_mask = (one << index) - 1;
+  __uint128_t unshifted_md = md & unshifted_mask;
+  __uint128_t shifted_md = (md & ~unshifted_mask) << 1;
+  __uint128_t bit128 = (((__uint128_t)bit) << index);
+  return shifted_md | bit128 | unshifted_md;
 }
 
 // number of 0s in the metadata is the number of tags.
