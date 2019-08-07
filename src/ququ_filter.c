@@ -115,11 +115,61 @@ void shuffle_256(uint8_t *source, uint8_t *map) {
 	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
 }
 
-void update_tags(ququ_block *block, uint8_t index, uint8_t tag) {
-  memmove(&block->tags[index + 1], &block->tags[index], 50 - index);
-  block->tags[index] = tag;
-}
+/*void update_tags(ququ_block *block, uint8_t index, uint8_t tag) {*/
+  /*memmove(&block->tags[index + 1], &block->tags[index], 50 - index);*/
+  /*block->tags[index] = tag;*/
+/*}*/
 
+void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
+	index = index + 13;		// offset index based on the md size
+	if (index < SHUFFLE_SIZE) {	// change in the first 32-bytes. Must move both halves.
+		/*Move first 32-bytes*/
+		// create a mapping vector
+		uint8_t map[SHUFFLE_SIZE];
+		for (uint8_t i = 0, j = 0; i < SHUFFLE_SIZE; i++) {
+			if (i == index) {
+				map[i] = SHUFFLE_SIZE - 1;
+			} else {
+				map[i] = j++;
+			}
+		}
+		uint8_t source[SHUFFLE_SIZE];
+		memcpy(source, block, SHUFFLE_SIZE);
+		uint8_t overflow_tag = source[SHUFFLE_SIZE - 1];
+		// add the new tag as the last index
+		source[SHUFFLE_SIZE - 1] = tag;
+		/*print_tags(source, SHUFFLE_SIZE);*/
+		shuffle_256(source, map);
+		/*print_tags(source, SHUFFLE_SIZE);*/
+		memcpy(block, source, SHUFFLE_SIZE);
+
+		/*move second 32-bytes*/
+		for (uint8_t i = 0, j = 0; i < SHUFFLE_SIZE; i++) {
+			map[i] = j++;
+		}
+		memcpy(source, block + SHUFFLE_SIZE, SHUFFLE_SIZE);
+		shuffle_256(source, map);
+		source[0] = overflow_tag;
+		memcpy(block + SHUFFLE_SIZE, source, SHUFFLE_SIZE);
+	} else {	// change in the second 32-bytes chunk. Only affects the second half.
+		index = index - SHUFFLE_SIZE;
+		// create a mapping vector
+		uint8_t map[SHUFFLE_SIZE];
+		for (uint8_t i = 0, j = 0; i < SHUFFLE_SIZE; i++) {
+			if (i == index) {
+				map[i] = SHUFFLE_SIZE - 1;
+			} else {
+				map[i] = j++;
+			}
+		}
+		uint8_t source[SHUFFLE_SIZE];
+		memcpy(source, block + SHUFFLE_SIZE, SHUFFLE_SIZE);
+		// add the new tag as the last index
+		source[SHUFFLE_SIZE - 1] = tag;
+		shuffle_256(source, map);
+		memcpy(block + SHUFFLE_SIZE, source, SHUFFLE_SIZE);
+	}
+}
 
 __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
   static const __uint128_t one = 1;
@@ -216,7 +266,9 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
 
-	update_tags(&filter->blocks[index], slot_index,	tag);
+	/*update_tags(&filter->blocks[index], slot_index,	tag);*/
+	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
+							tag);
 	filter->blocks[index].md = update_md(filter->blocks[index].md, select_index, 0);
 	/*print_block(filter, index);*/
 	return 0;
