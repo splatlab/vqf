@@ -73,6 +73,14 @@ int64_t select_128(__uint128_t vector, uint64_t rank) {
 
 #define SHUFFLE_SIZE 32
 
+void shuffle_256(uint8_t *source, uint8_t *map) {
+	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
+	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
+
+	vector = _mm256_shuffle_epi8(vector, shuffle);
+	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
+}
+
 void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 	index = index + 13;		// offset index based on the md size
 	if (index < SHUFFLE_SIZE) {	// change in the first 32-bytes. Must move both halves.
@@ -91,11 +99,7 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 		uint8_t overflow_tag = source[SHUFFLE_SIZE - 1];
 		// add the new tag as the last index
 		source[SHUFFLE_SIZE - 1] = tag;
-		__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
-		__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
-
-		vector = _mm256_shuffle_epi8(vector, shuffle);
-		_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
+		shuffle_256(source, map);
 		memcpy(block, source, SHUFFLE_SIZE);
 
 		/* move second 32-bytes */
@@ -103,11 +107,7 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 			map[i] = j++;
 		}
 		memcpy(source, block + SHUFFLE_SIZE, SHUFFLE_SIZE);
-		vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
-		shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
-
-		vector = _mm256_shuffle_epi8(vector, shuffle);
-		_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
+		shuffle_256(source, map);
 		source[0] = overflow_tag;
 		memcpy(block + SHUFFLE_SIZE, source, SHUFFLE_SIZE);
 	} else {	// change in the second 32-bytes chunk. Only affects the second half.
@@ -125,11 +125,7 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 		memcpy(source, block, SHUFFLE_SIZE);
 		// add the new tag as the last index
 		source[SHUFFLE_SIZE - 1] = tag;
-		__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
-		__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
-
-		vector = _mm256_shuffle_epi8(vector, shuffle);
-		_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
+		shuffle_256(source, map);
 		memcpy(block, source, SHUFFLE_SIZE);
 	}
 }
