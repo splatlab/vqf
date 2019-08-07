@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 
 	/* initialize ququ filter */
 	if (ququ_init(&filter, nslots) < 0) {
-		perror("Can't allocate ququ filter.");
+		fprintf(stderr, "Can't allocate ququ filter.");
 		exit(EXIT_FAILURE);
 	}
 
@@ -49,11 +49,11 @@ int main(int argc, char **argv)
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 		if (ququ_insert(&filter, vals[i]) < 0) {
-			perror("Insertion failed");
+			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
 		if (!ququ_is_present(&filter, vals[i])) {
-			perror("Lookup failed");
+			fprintf(stderr, "Lookup failed");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -80,8 +80,8 @@ int main(int argc, char **argv)
 	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
 	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(order));
 
-	//vector = _mm256_shuffle_epi8(vector, shuffle);
-	vector = Shuffle(vector, shuffle);
+	vector = _mm256_shuffle_epi8(vector, shuffle);
+	//vector = Shuffle(vector, shuffle);
 	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
 
 	std::cout << "vector after shuffle: \n";

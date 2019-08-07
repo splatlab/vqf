@@ -52,31 +52,51 @@ static inline uint64_t word_select(uint64_t val, int rank) {
 // select(vec, 0) -> -1
 // select(vec, i) -> 128, if i > popcnt(vec)
 int64_t select_128(__uint128_t vector, uint64_t rank) {
-	if (rank == 0) {
-		return -1;
+	uint64_t lower_word = vector & BITMASK(64);
+	uint64_t lower_rank = word_rank(lower_word);
+	if (lower_rank > rank) {
+		return word_select(lower_word, rank);
 	} else {
-		uint64_t lower_word = vector & BITMASK(64);
-		uint64_t lower_rank = word_rank(lower_word);
-		if (lower_rank > rank) {
-			return word_select(lower_word, rank);
+		rank = rank - lower_rank;
+		uint64_t higher_word = vector >> 64;
+		if ((uint64_t)word_rank(higher_word) > rank) {
+			return word_select(higher_word, rank) + 64;
 		} else {
-			rank = rank - lower_rank;
-			uint64_t higher_word = vector >> 64;
-			if ((uint64_t)word_rank(higher_word) > rank) {
-				return word_select(higher_word, rank) + 64;
-			} else {
-				return 128;
-			}
+			return 128;
 		}
 	}
 }
 
 #define SHUFFLE_SIZE 32
 
-void print_tags(uint8_t *tags) {
-	for (uint8_t i = 0; i < SHUFFLE_SIZE; i++)
+//assumes little endian
+void print_bits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i=size-1;i>=0;i--)
+    {
+        for (j=7;j>=0;j--)
+        {
+            byte = (b[i] >> j) & 1;
+            printf("%u", byte);
+        }
+    }
+    puts("");
+}
+
+void print_tags(uint8_t *tags, uint32_t size) {
+	for (uint8_t i = 0; i < size; i++)
 		printf("%d ", (uint32_t)tags[i]);
 	printf("\n");
+}
+
+void print_block(ququ_filter *filter, uint64_t block_index) {
+	__uint128_t md = filter->blocks[block_index].md;
+	print_bits(9, reinterpret_cast<void *>(&md));
+	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 51);
 }
 
 const __m256i K0 = _mm256_setr_epi8(
@@ -119,9 +139,9 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 		uint8_t overflow_tag = source[SHUFFLE_SIZE - 1];
 		// add the new tag as the last index
 		source[SHUFFLE_SIZE - 1] = tag;
-		/*print_tags(source);*/
+		/*print_tags(source, SHUFFLE_SIZE);*/
 		shuffle_256(source, map);
-		/*print_tags(source);*/
+		/*print_tags(source, SHUFFLE_SIZE);*/
 		memcpy(block, source, SHUFFLE_SIZE);
 
 		/* move second 32-bytes */
@@ -232,7 +252,7 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 																		 QUQU_SLOTS_PER_BLOCK].md);
 	if (primary_load == QUQU_SLOTS_PER_BLOCK && alt_load ==
 			QUQU_SLOTS_PER_BLOCK) {
-		perror("ququ filter is full.");
+		fprintf(stderr, "ququ filter is full.");
 		exit(EXIT_FAILURE);
 	}
 	// pick the least loaded block
@@ -256,8 +276,13 @@ bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
 	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
 
-	uint64_t start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
-	uint64_t end = select_128(filter->blocks[index].md, offset) - offset;
+	uint64_t start, end;
+	if (offset == 0) {
+		start = 0;
+	} else {
+		start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
+	}
+	end = select_128(filter->blocks[index].md, offset) - offset;
 
 	for (uint64_t i = start; i < end; i++) {
 		if (tag == filter->blocks[index].tags[i])
