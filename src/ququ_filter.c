@@ -70,21 +70,11 @@ int64_t select_128(__uint128_t vector, uint64_t rank) {
 #define SHUFFLE_SIZE 32
 
 //assumes little endian
-void print_bits(size_t const size, void const * const ptr)
+void print_bits(__uint128_t num, int numbits)
 {
-    unsigned char *b = (unsigned char*) ptr;
-    unsigned char byte;
-    int i, j;
-
-    for (i=size-1;i>=0;i--)
-    {
-        for (j=7;j>=0;j--)
-        {
-            byte = (b[i] >> j) & 1;
-            printf("%u", byte);
-        }
-    }
-    puts("");
+  int i;
+  for (i = 0 ; i < numbits; i++)
+    printf("%d", ((num >> i) & 1) == 1);
 }
 
 void print_tags(uint8_t *tags, uint32_t size) {
@@ -97,7 +87,7 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
-	print_bits(13, reinterpret_cast<void *>(&md));
+	print_bits(md, 102);
 	printf("tags: ");
 	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 51);
 }
