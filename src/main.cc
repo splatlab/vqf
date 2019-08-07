@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 	ququ_filter filter;	
 
 	/* initialize ququ filter */
-	if (ququ_init(&filter, nslots)) {
+	if (ququ_init(&filter, nslots) < 0) {
 		perror("Can't allocate ququ filter.");
 		exit(EXIT_FAILURE);
 	}
@@ -46,18 +46,16 @@ int main(int argc, char **argv)
 
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(&filter, vals[i])) {
+		if (ququ_insert(&filter, vals[i]) < 0) {
 			perror("Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-	}
-
-	for (uint64_t i = 0; i < nvals; i++) {
 		if (!ququ_insert(&filter, vals[i])) {
 			perror("Lookup failed");
 			exit(EXIT_FAILURE);
 		}
 	}
+
 
 #if 0
 	uint8_t source[SIZE];

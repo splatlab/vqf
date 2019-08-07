@@ -62,7 +62,7 @@ int64_t select_128(__uint128_t vector, uint64_t rank) {
 		} else {
 			rank = rank - lower_rank;
 			uint64_t higher_word = vector >> 64;
-			if ((uint64_t)word_rank(lower_word) > rank) {
+			if ((uint64_t)word_rank(higher_word) > rank) {
 				return word_select(higher_word, rank);
 			} else {
 				return 128;
@@ -221,7 +221,7 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
 
-	uint64_t select_index = select_128(filter->blocks[index].md, offset + 1);
+	uint64_t select_index = select_128(filter->blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
 	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
 							tag);
