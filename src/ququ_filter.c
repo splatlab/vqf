@@ -249,7 +249,8 @@ bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
 bool ququ_is_present(ququ_filter *filter, __uint128_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
-	uint64_t alt_block_index = block_index ^ (tag * 0x5bd1e995) >>
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
+															filter->metadata->range) >>
 		filter->metadata->key_remainder_bits;
 
 	return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,

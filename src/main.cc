@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 			perror("Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-		if (!ququ_insert(&filter, vals[i])) {
+		if (!ququ_is_present(&filter, vals[i])) {
 			perror("Lookup failed");
 			exit(EXIT_FAILURE);
 		}
