@@ -19,11 +19,16 @@
 extern "C" {
 #endif
 
+	// metadata: 1 --> end of the run
+	// Each 1 is preceded by k 0s, where k is the number of remainders in that
+	// run.
+
 	// We are using 8-bit slots.
-	// One block consists of 48 8-bit slots and 64 2-bit metadata.
+	// One block consists of 51 8-bit slots and 51 2-bit metadata.
 	typedef struct __attribute__ ((__packed__)) ququ_block {
-		uint64_t metadata[2];
-		uint8_t tags[48];
+		__uint128_t md:102;
+		__uint8_t reserved:2;
+		uint8_t tags[51];
 	} ququ_block;
 
 	typedef struct ququ_metadata {
@@ -35,7 +40,6 @@ extern "C" {
 		uint64_t nblocks;
 		uint64_t nelts;
 		uint64_t nslots;
-		uint64_t noccupied_slots;
 	} ququ_metadata;
 
 	typedef struct ququ_filter {
@@ -43,11 +47,11 @@ extern "C" {
 		ququ_block *blocks;
 	} ququ_filter;
 
-	int ququ_init(ququ_filter *filter, uint64_t nslots, uint64_t keybits);
+	int ququ_init(ququ_filter *filter, uint64_t nslots);
 
-	int ququ_insert(ququ_filter *filter, uint64_t item);
+	int ququ_insert(ququ_filter *filter, __uint128_t hash);
 
-	bool ququ_is_present(ququ_filter *filter, uint64_t item);
+	bool ququ_is_present(ququ_filter *filter, __uint128_t hash);
 
 #ifdef __cplusplus
 }
