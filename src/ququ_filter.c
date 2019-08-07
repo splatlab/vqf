@@ -75,6 +75,7 @@ void print_bits(__uint128_t num, int numbits)
   int i;
   for (i = 0 ; i < numbits; i++)
     printf("%d", ((num >> i) & 1) == 1);
+	puts("");
 }
 
 void print_tags(uint8_t *tags, uint32_t size) {
@@ -157,11 +158,11 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 			}
 		}
 		uint8_t source[SHUFFLE_SIZE];
-		memcpy(source, block, SHUFFLE_SIZE);
+		memcpy(source, block + SHUFFLE_SIZE, SHUFFLE_SIZE);
 		// add the new tag as the last index
 		source[SHUFFLE_SIZE - 1] = tag;
 		shuffle_256(source, map);
-		memcpy(block, source, SHUFFLE_SIZE);
+		memcpy(block + SHUFFLE_SIZE, source, SHUFFLE_SIZE);
 	}
 }
 
