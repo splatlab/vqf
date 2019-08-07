@@ -30,7 +30,7 @@ CXXFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
 
 CFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
 
-LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lm -lz -lrt
+LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm
 
 #
 # declaration of dependencies

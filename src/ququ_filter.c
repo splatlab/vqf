@@ -161,7 +161,7 @@ int ququ_init(ququ_filter *filter, uint64_t nslots) {
 		perror("Can't allocate memory for metadata");
 		exit(EXIT_FAILURE);
 	}
-	uint64_t total_blocks = nslots/48;
+	uint64_t total_blocks = nslots/QUQU_SLOTS_PER_BLOCK;
 	uint64_t total_slots = nslots;
 	uint64_t total_q_bits = 0;
 	while (total_slots > 1) {
@@ -184,10 +184,10 @@ int ququ_init(ququ_filter *filter, uint64_t nslots) {
 		exit(EXIT_FAILURE);
 	}
 	// memset to 1
-	if (memset(filter->blocks, 1, filter->metadata->total_size_in_bytes) ==
-			NULL) {
-		perror("Memset failed");
-		exit(EXIT_FAILURE);
+	for (uint64_t i = 0; i < total_blocks; i++) {
+		__uint128_t set_vector = UINT64_MAX;
+		set_vector = set_vector << 64 | UINT64_MAX;
+		filter->blocks[i].md = set_vector;
 	}
 
 	return 0;
@@ -200,22 +200,32 @@ int ququ_init(ququ_filter *filter, uint64_t nslots) {
 int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
-	uint64_t alt_block_index = block_index ^ (tag * 0x5bd1e995) >>
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
+															filter->metadata->range) >>
 		filter->metadata->key_remainder_bits;
 
+	uint64_t primary_load =	get_block_load(filter->blocks[block_index /
+																				 QUQU_SLOTS_PER_BLOCK].md); 
+	uint64_t alt_load =	get_block_load(filter->blocks[alt_block_index /
+																		 QUQU_SLOTS_PER_BLOCK].md);
+	if (primary_load == QUQU_SLOTS_PER_BLOCK && alt_load ==
+			QUQU_SLOTS_PER_BLOCK) {
+		perror("ququ filter is full.");
+		exit(EXIT_FAILURE);
+	}
 	// pick the least loaded block
-	if (get_block_load(alt_block_index) < get_block_load(block_index)) {
+	if (alt_load < primary_load) {
 		block_index = alt_block_index;
 	}
 
-	uint64_t block_offset = block_index % QUQU_SLOTS_PER_BLOCK;
+	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
 
-	uint64_t select_index = select_128(filter->blocks[block_index].md,
-																		 block_offset + 1);
-	uint64_t index = select_index - block_offset;
-	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[block_index]), index,
+	uint64_t select_index = select_128(filter->blocks[index].md, offset + 1);
+	uint64_t slot_index = select_index - offset;
+	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
 							tag);
-	filter->blocks[block_index].md = update_md(filter->blocks[block_index].md,
+	filter->blocks[block_index].md = update_md(filter->blocks[index].md,
 																						 select_index, 0);
 	return 0;
 }
