@@ -14,12 +14,13 @@
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 #include <openssl/rand.h>
+#include <sys/time.h>
 
 #include "ququ_filter.h"
 
 /* Print elapsed time using the start and end timeval */
-void print_time_elapsed(std::string desc, struct timeval* start, struct
-												timeval* end, spdlog::logger* console)
+void print_time_elapsed(const char* desc, struct timeval* start, struct
+												timeval* end)
 {
 	struct timeval elapsed;
 	if (start->tv_usec > end->tv_usec) {
@@ -29,8 +30,7 @@ void print_time_elapsed(std::string desc, struct timeval* start, struct
 	elapsed.tv_usec = end->tv_usec - start->tv_usec;
 	elapsed.tv_sec = end->tv_sec - start->tv_sec;
 	float time_elapsed = (elapsed.tv_sec * 1000000 + elapsed.tv_usec)/1000000.f;
-	console->info("{} Total Time Elapsed: {} seconds", desc,
-								std::to_string(time_elapsed));
+	printf("%s Total Time Elapsed: %f seconds", desc, time_elapsed);
 }
 
 int main(int argc, char **argv)
@@ -65,18 +65,20 @@ int main(int argc, char **argv)
 	struct timeval start, end;
 	struct timezone tzp;
 
-	gettimeofday(&start, tzp);
+	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 		if (ququ_insert(&filter, vals[i]) < 0) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-		if (!ququ_is_present(&filter, vals[i])) {
-			fprintf(stderr, "Lookup failed for %ld", vals[i]);
-			exit(EXIT_FAILURE);
-		}
+		//if (!ququ_is_present(&filter, vals[i])) {
+			//fprintf(stderr, "Lookup failed for %ld", vals[i]);
+			//exit(EXIT_FAILURE);
+		//}
 	}
+	gettimeofday(&end, &tzp);
+	print_time_elapsed("Insertion time", &start, &end);
 
 #else
 #define SIZE 32

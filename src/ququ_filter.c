@@ -218,7 +218,7 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 
 	update_tags(&filter->blocks[index], slot_index,	tag);
 	filter->blocks[index].md = update_md(filter->blocks[index].md, select_index, 0);
-	print_block(filter, index);
+	/*print_block(filter, index);*/
 	return 0;
 }
 
