@@ -96,7 +96,7 @@ void print_tags(uint8_t *tags, uint32_t size) {
 void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
-	print_bits(9, reinterpret_cast<void *>(&md));
+	print_bits(13, reinterpret_cast<void *>(&md));
 	printf("tags: ");
 	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 51);
 }
