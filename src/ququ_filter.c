@@ -224,9 +224,29 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 	return 0;
 }
 
+bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
+	uint64_t block_offset = block_index % QUQU_SLOTS_PER_BLOCK;
+	uint64_t start = select_128(filter->blocks[block_index].md, block_offset) -
+		block_offset + 1;
+	uint64_t end = select_128(filter->blocks[block_index].md, block_offset + 1)
+		- block_offset;
+
+	for (uint64_t i = start; i < end; i++) {
+		if (tag == filter->blocks[block_index].tags[i])
+			return true;
+	}
+	return false;
+}
+
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter *filter, __uint128_t hash) {
-	return true;
+	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
+	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
+	uint64_t alt_block_index = block_index ^ (tag * 0x5bd1e995) >>
+		filter->metadata->key_remainder_bits;
+
+	return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
+																																	alt_block_index);
 }
 
