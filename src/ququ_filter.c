@@ -94,8 +94,10 @@ void print_tags(uint8_t *tags, uint32_t size) {
 }
 
 void print_block(ququ_filter *filter, uint64_t block_index) {
+	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
 	print_bits(9, reinterpret_cast<void *>(&md));
+	printf("tags: ");
 	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 51);
 }
 
@@ -300,7 +302,13 @@ bool ququ_is_present(ququ_filter *filter, __uint128_t hash) {
 															filter->metadata->range) >>
 		filter->metadata->key_remainder_bits;
 
-	return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
+	bool ret = check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
 																																	alt_block_index);
+	if (!ret) {
+		printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);
+		print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);
+		print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);
+	}
+	return ret;
 }
 
