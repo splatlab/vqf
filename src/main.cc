@@ -17,6 +17,21 @@
 
 #include "ququ_filter.h"
 
+/* Print elapsed time using the start and end timeval */
+void print_time_elapsed(std::string desc, struct timeval* start, struct
+												timeval* end, spdlog::logger* console)
+{
+	struct timeval elapsed;
+	if (start->tv_usec > end->tv_usec) {
+		end->tv_usec += 1000000;
+		end->tv_sec--;
+	}
+	elapsed.tv_usec = end->tv_usec - start->tv_usec;
+	elapsed.tv_sec = end->tv_sec - start->tv_sec;
+	float time_elapsed = (elapsed.tv_sec * 1000000 + elapsed.tv_usec)/1000000.f;
+	console->info("{} Total Time Elapsed: {} seconds", desc,
+								std::to_string(time_elapsed));
+}
 
 int main(int argc, char **argv)
 {
@@ -47,6 +62,10 @@ int main(int argc, char **argv)
 		//vals[i] = (1 * vals[i]) % filter.metadata->range;
 	}
 
+	struct timeval start, end;
+	struct timezone tzp;
+
+	gettimeofday(&start, tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 		if (ququ_insert(&filter, vals[i]) < 0) {

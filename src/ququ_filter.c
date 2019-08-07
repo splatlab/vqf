@@ -259,8 +259,8 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 	uint64_t select_index = select_128(filter->blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
 	
-	printf("tag: %ld offset: %ld\n", tag, offset);
-	print_block(filter, index);
+	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
+	/*print_block(filter, index);*/
 
 	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
 							tag);
