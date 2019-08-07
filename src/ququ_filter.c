@@ -304,11 +304,11 @@ bool ququ_is_present(ququ_filter *filter, __uint128_t hash) {
 
 	bool ret = check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
 																																	alt_block_index);
-	if (!ret) {
-		printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);
-		print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);
-		print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);
-	}
+	/*if (!ret) {*/
+		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
+		/*print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);*/
+		/*print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);*/
+	/*}*/
 	return ret;
 }
 
