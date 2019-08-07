@@ -17,8 +17,10 @@
 
 #include "ququ_filter.h"
 
+
 int main(int argc, char **argv)
 {
+#if 1
 	if (argc < 2) {
 		fprintf(stderr, "Please specify the log of the number of slots in the CQF.\n");
 		exit(1);
@@ -56,14 +58,19 @@ int main(int argc, char **argv)
 		}
 	}
 
-
-#if 0
+#else
+#define SIZE 32
 	uint8_t source[SIZE];
 	uint8_t order[SIZE];
 	for (uint8_t i = 0; i < SIZE; i++) {
 		source[i] = i;
-		order[i] = i - 1;
+		order[i] = SIZE-i-1;
 	}
+
+	std::cout << "order vector: \n";
+	for (uint8_t i = 0; i < SIZE; i++)
+		std::cout << (uint32_t)order[i] << " ";
+	std::cout << "\n";
 
 	std::cout << "vector before shuffle: \n";
 	for (uint8_t i = 0; i < SIZE; i++)
@@ -73,7 +80,8 @@ int main(int argc, char **argv)
 	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
 	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(order));
 
-	vector = _mm256_shuffle_epi8(vector, shuffle);
+	//vector = _mm256_shuffle_epi8(vector, shuffle);
+	vector = Shuffle(vector, shuffle);
 	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
 
 	std::cout << "vector after shuffle: \n";

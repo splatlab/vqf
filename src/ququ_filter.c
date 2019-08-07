@@ -63,7 +63,7 @@ int64_t select_128(__uint128_t vector, uint64_t rank) {
 			rank = rank - lower_rank;
 			uint64_t higher_word = vector >> 64;
 			if ((uint64_t)word_rank(higher_word) > rank) {
-				return word_select(higher_word, rank);
+				return word_select(higher_word, rank) + 64;
 			} else {
 				return 128;
 			}
@@ -73,11 +73,31 @@ int64_t select_128(__uint128_t vector, uint64_t rank) {
 
 #define SHUFFLE_SIZE 32
 
+void print_tags(uint8_t *tags) {
+	for (uint8_t i = 0; i < SHUFFLE_SIZE; i++)
+		printf("%d ", (uint32_t)tags[i]);
+	printf("\n");
+}
+
+const __m256i K0 = _mm256_setr_epi8(
+    0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0);
+
+const __m256i K1 = _mm256_setr_epi8(
+    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0,
+    0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70);
+
+inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle)
+{
+    return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle, K0)),
+        _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E), _mm256_add_epi8(shuffle, K1)));
+}
+
 void shuffle_256(uint8_t *source, uint8_t *map) {
 	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
 	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
 
-	vector = _mm256_shuffle_epi8(vector, shuffle);
+	vector = cross_lane_shuffle(vector, shuffle);
 	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
 }
 
@@ -99,7 +119,9 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 		uint8_t overflow_tag = source[SHUFFLE_SIZE - 1];
 		// add the new tag as the last index
 		source[SHUFFLE_SIZE - 1] = tag;
+		/*print_tags(source);*/
 		shuffle_256(source, map);
+		/*print_tags(source);*/
 		memcpy(block, source, SHUFFLE_SIZE);
 
 		/* move second 32-bytes */
@@ -231,14 +253,14 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 }
 
 bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
-	uint64_t block_offset = block_index % QUQU_SLOTS_PER_BLOCK;
-	uint64_t start = select_128(filter->blocks[block_index].md, block_offset) -
-		block_offset + 1;
-	uint64_t end = select_128(filter->blocks[block_index].md, block_offset + 1)
-		- block_offset;
+	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
+
+	uint64_t start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
+	uint64_t end = select_128(filter->blocks[index].md, offset) - offset;
 
 	for (uint64_t i = start; i < end; i++) {
-		if (tag == filter->blocks[block_index].tags[i])
+		if (tag == filter->blocks[index].tags[i])
 			return true;
 	}
 	return false;
