@@ -94,6 +94,7 @@ void print_tags(uint8_t *tags, uint32_t size) {
 }
 
 void print_block(ququ_filter *filter, uint64_t block_index) {
+	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
 	print_bits(13, reinterpret_cast<void *>(&md));
@@ -267,10 +268,15 @@ int ququ_insert(ququ_filter *filter, __uint128_t hash) {
 
 	uint64_t select_index = select_128(filter->blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
+	
+	printf("tag: %ld offset: %ld\n", tag, offset);
+	print_block(filter, index);
+
 	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
 							tag);
 	filter->blocks[index].md = update_md(filter->blocks[index].md, select_index,
 																			 0);
+	print_block(filter, index);
 	return 0;
 }
 

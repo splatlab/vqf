@@ -43,7 +43,8 @@ int main(int argc, char **argv)
 	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter.metadata->range;
+		vals[i] = rand() % filter.metadata->range;
+		//vals[i] = (1 * vals[i]) % filter.metadata->range;
 	}
 
 	/* Insert hashes in the ququ filter */
@@ -53,7 +54,7 @@ int main(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 		if (!ququ_is_present(&filter, vals[i])) {
-			fprintf(stderr, "Lookup failed");
+			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}
 	}
