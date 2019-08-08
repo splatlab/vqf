@@ -25,7 +25,8 @@
   ((nbits) == 64 ? 0xffffffffffffffff : MAX_VALUE(nbits))
 
 #define SEED 2038074761
-#define QUQU_SLOTS_PER_BLOCK 51
+#define QUQU_SLOTS_PER_BLOCK 48
+#define QUQU_BUCKETS_PER_BLOCK 80
 
 static inline int word_rank(uint64_t val) {
 	asm("popcnt %[val], %[val]"
@@ -117,7 +118,7 @@ void shuffle_256(uint8_t * restrict source, uint8_t * restrict map) {
 
 #if 1
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
-	memmove(&block->tags[index + 1], &block->tags[index], 50 - index);
+	memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
 	block->tags[index] = tag;
 }
 
@@ -189,7 +190,7 @@ static inline uint64_t get_block_load(__uint128_t vector) {
 	uint64_t lower_word = vector & BITMASK(64);
 	uint64_t higher_word = vector >> 64;
 	uint64_t popcnt = word_rank(lower_word) + word_rank(higher_word);
-	return (102 - popcnt);
+	return (QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK - popcnt);
 }
 
 // Create n/log(n) blocks of log(n) slots.
@@ -203,20 +204,13 @@ int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
 		perror("Can't allocate memory for metadata");
 		exit(EXIT_FAILURE);
 	}
-	uint64_t total_blocks = nslots/QUQU_SLOTS_PER_BLOCK;
-	uint64_t total_slots = nslots;
-	uint64_t total_q_bits = 0;
-	while (total_slots > 1) {
-		total_slots >>= 1;
-		total_q_bits++;
-	}
+	uint64_t total_blocks = (nslots + QUQU_SLOTS_PER_BLOCK)/QUQU_SLOTS_PER_BLOCK;
 
 	filter->metadata->total_size_in_bytes = sizeof(ququ_block) * total_blocks;
 	filter->metadata->seed = SEED;
-	filter->metadata->nslots = nslots;
-	filter->metadata->key_bits = total_q_bits + 8;
+	filter->metadata->nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
 	filter->metadata->key_remainder_bits = 8;
-	filter->metadata->range = MAX_VALUE(filter->metadata->key_bits);
+	filter->metadata->range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata->key_remainder_bits);
 	filter->metadata->nblocks = total_blocks;
 	filter->metadata->nelts = 0;
 
@@ -249,8 +243,8 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
-	uint64_t primary_load =	get_block_load(blocks[block_index     / QUQU_SLOTS_PER_BLOCK].md);
-	uint64_t     alt_load =	get_block_load(blocks[alt_block_index / QUQU_SLOTS_PER_BLOCK].md);
+	uint64_t primary_load =	get_block_load(blocks[block_index     / QUQU_BUCKETS_PER_BLOCK].md);
+	uint64_t     alt_load =	get_block_load(blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK].md);
   
 	// pick the least loaded block
 	if (alt_load < primary_load) {
@@ -260,8 +254,8 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 		exit(EXIT_FAILURE);
 	}
 
-	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
-	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
+	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 	uint64_t select_index = select_128(blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
@@ -285,8 +279,8 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 }
 
 static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64_t block_index) {
-	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
-	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
+	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 	uint64_t start, end;
 	if (offset == 0) {
