@@ -260,19 +260,15 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 	uint64_t select_index = select_128(blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
 
-	ququ_block block = blocks[index];
-
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
 
 #if 1
-	update_tags(&block, slot_index,	tag);
+	update_tags(&blocks[index], slot_index,	tag);
 #else
-	update_tags(reinterpret_cast<uint8_t*>(&block), slot_index,tag);
+	update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
 #endif
-	block.md = update_md(block.md, select_index, 0);
-
-	blocks[index] = block;
+	blocks[index].md = update_md(blocks[index].md, select_index, 0);
 
 	/*print_block(filter, index);*/
 	return 0;
