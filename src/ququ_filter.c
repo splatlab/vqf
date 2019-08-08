@@ -170,14 +170,13 @@ static inline void update_tags(uint8_t * restrict block, uint8_t index, uint8_t 
 }
 #endif
 
-static inline __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
+static inline __uint128_t update_md(__uint128_t md, uint8_t index) {
   static const __uint128_t one = 1;
   
   __uint128_t unshifted_mask = (one << index) - 1;
   __uint128_t unshifted_md = md & unshifted_mask;
   __uint128_t shifted_md = (md & ~unshifted_mask) << 1;
-  __uint128_t bit128 = (((__uint128_t)bit) << index);
-  return shifted_md | bit128 | unshifted_md;
+  return shifted_md | unshifted_md;
 }
 
 // number of 0s in the metadata is the number of tags.
@@ -261,7 +260,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 #else
 	update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
 #endif
-	blocks[index].md = update_md(block_md, select_index, 0);
+	blocks[index].md = update_md(block_md, select_index);
 
 	/*print_block(filter, index);*/
 	return 0;
