@@ -60,11 +60,7 @@ static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
 	} else {
 		rank = rank - lower_rank;
 		uint64_t higher_word = vector >> 64;
-		if ((uint64_t)word_rank(higher_word) > rank) {
-			return word_select(higher_word, rank) + 64;
-		} else {
-			return 128;
-		}
+    return word_select(higher_word, rank) + 64;
 	}
 }
 
