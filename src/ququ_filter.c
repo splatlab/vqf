@@ -222,11 +222,11 @@ ququ_filter * ququ_init(uint64_t nslots) {
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
 // by 1 bit.
 // Insert the new tag at the end of its run and shift the rest by 1 slot.
-int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
+int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
 	ququ_block    * restrict blocks             = filter->blocks;
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
-	__uint128_t              range              = metadata->range;
+	uint64_t                 range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
   __uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
@@ -289,7 +289,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
-bool ququ_is_present(ququ_filter * restrict filter, __uint128_t hash) {
+bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata.key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %

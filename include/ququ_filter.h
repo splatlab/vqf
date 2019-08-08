@@ -36,7 +36,7 @@ extern "C" {
 		uint64_t total_size_in_bytes;
 		uint32_t seed;
 		uint64_t key_remainder_bits;
-		__uint128_t range;
+		uint64_t range;
 		uint64_t nblocks;
 		uint64_t nelts;
 		uint64_t nslots;
@@ -49,9 +49,9 @@ extern "C" {
 
 	ququ_filter * ququ_init(uint64_t nslots);
 
-	int ququ_insert(ququ_filter * restrict filter, __uint128_t hash);
+	int ququ_insert(ququ_filter * restrict filter, uint64_t hash);
 
-	bool ququ_is_present(ququ_filter * restrict filter, __uint128_t hash);
+	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash);
 
 #ifdef __cplusplus
 }
