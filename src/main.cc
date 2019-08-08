@@ -79,6 +79,17 @@ int main(int argc, char **argv)
 	}
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end);
+	puts("");
+	gettimeofday(&start, &tzp);
+	/* Insert hashes in the ququ filter */
+	for (uint64_t i = 0; i < nvals; i++) {
+		if (!ququ_is_present(&filter, vals[i])) {
+			fprintf(stderr, "Lookup failed for %ld", vals[i]);
+			exit(EXIT_FAILURE);
+		}
+	}
+	gettimeofday(&end, &tzp);
+	print_time_elapsed("Lookup time", &start, &end);
 
 #else
 #define SIZE 32
