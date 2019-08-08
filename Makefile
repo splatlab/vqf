@@ -19,8 +19,8 @@ ifdef P
 endif
 
 CXX = g++ -std=c++11 -mavx2
-CC = clang -std=gnu11 -mavx2
-LD= clang -std=c++11
+CC = gcc -std=gnu11 -mavx2
+LD= gcc -std=c++11
 
 LOC_INCLUDE=include
 LOC_SRC=src
