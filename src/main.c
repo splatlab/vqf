@@ -9,8 +9,8 @@
  * ============================================================================
  */
 
-#include <iostream>
 #include <stdint.h>
+#include <stdio.h>
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 #include <openssl/rand.h>

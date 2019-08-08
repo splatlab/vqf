@@ -9,7 +9,6 @@
  * ============================================================================
  */
 
-#include <iostream>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
@@ -85,32 +84,32 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
-	print_bits(md, 128);
+	print_bits(md, QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK);
 	printf("tags: ");
-	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 48);
+	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
 
-const __m256i K0 = _mm256_setr_epi8(
-    0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0);
+/* const __m256i K0 = _mm256_setr_epi8( */
+/*     0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, */
+/*     0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0); */
 
-const __m256i K1 = _mm256_setr_epi8(
-    0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0,
-    0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70);
+/* const __m256i K1 = _mm256_setr_epi8( */
+/*     0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, */
+/*     0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70); */
 
-inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle)
-{
-    return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle, K0)),
-        _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E), _mm256_add_epi8(shuffle, K1)));
-}
+/* inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle) */
+/* { */
+/*     return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle, K0)), */
+/*         _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E), _mm256_add_epi8(shuffle, K1))); */
+/* } */
 
-void shuffle_256(uint8_t * restrict source, uint8_t * restrict map) {
-	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
-	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
+/* void shuffle_256(uint8_t * restrict source, uint8_t * restrict map) { */
+/* 	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source)); */
+/* 	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map)); */
 
-	vector = cross_lane_shuffle(vector, shuffle);
-	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
-}
+/* 	vector = cross_lane_shuffle(vector, shuffle); */
+/* 	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector); */
+/* } */
 
 #if 1
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
