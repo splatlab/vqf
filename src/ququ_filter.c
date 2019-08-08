@@ -186,11 +186,10 @@ static inline __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) 
 }
 
 // number of 0s in the metadata is the number of tags.
-static inline uint64_t get_block_load(__uint128_t vector) {
+static inline uint64_t get_block_free_space(__uint128_t vector) {
 	uint64_t lower_word = vector & BITMASK(64);
 	uint64_t higher_word = vector >> 64;
-	uint64_t popcnt = word_rank(lower_word) + word_rank(higher_word);
-	return (QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK - popcnt);
+	return word_rank(lower_word) + word_rank(higher_word);
 }
 
 // Create n/log(n) blocks of log(n) slots.
@@ -243,13 +242,13 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
-	uint64_t primary_load =	get_block_load(blocks[block_index     / QUQU_BUCKETS_PER_BLOCK].md);
-	uint64_t     alt_load =	get_block_load(blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK].md);
+	uint64_t primary_free =	get_block_free_space(blocks[block_index     / QUQU_BUCKETS_PER_BLOCK].md);
+	uint64_t     alt_free =	get_block_free_space(blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK].md);
 
 	// pick the least loaded block
-	if (alt_load < primary_load) {
+	if (alt_free > primary_free) {
 		block_index = alt_block_index;
-	} else if (primary_load == QUQU_SLOTS_PER_BLOCK) {
+	} else if (primary_free == QUQU_BUCKETS_PER_BLOCK) {
 		fprintf(stderr, "ququ filter is full.");
 		exit(EXIT_FAILURE);
 	}

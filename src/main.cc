@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 	}
 	uint64_t qbits = atoi(argv[1]);
 	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 85*nslots/100;
+	uint64_t nvals = 90*nslots/100;
 	uint64_t *vals;
 
 	ququ_filter filter;	
