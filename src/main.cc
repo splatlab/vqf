@@ -45,10 +45,10 @@ int main(int argc, char **argv)
 	uint64_t nvals = 85*nslots/100;
 	uint64_t *vals;
 
-	ququ_filter filter;	
+	ququ_filter *filter;	
 
 	/* initialize ququ filter */
-	if (ququ_init(&filter, nslots) < 0) {
+	if ((filter = ququ_init(nslots)) == NULL) {
 		fprintf(stderr, "Can't allocate ququ filter.");
 		exit(EXIT_FAILURE);
 	}
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 	srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
 		//vals[i] = rand() % filter.metadata->range;
-		vals[i] = (1 * vals[i]) % filter.metadata->range;
+		vals[i] = (1 * vals[i]) % filter->metadata.range;
 	}
 
 	struct timeval start, end;
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(&filter, vals[i]) < 0) {
+		if (ququ_insert(filter, vals[i]) < 0) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_is_present(&filter, vals[i])) {
+		if (!ququ_is_present(filter, vals[i])) {
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}

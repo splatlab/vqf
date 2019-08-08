@@ -191,29 +191,23 @@ static inline uint64_t get_block_free_space(__uint128_t vector) {
 // Create n/log(n) blocks of log(n) slots.
 // log(n) is 51 given a cache line size.
 // n/51 blocks.
-int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
-	assert(word_rank(nslots) == 1); /* nslots must be a power of 2 */
-
-	filter->metadata = (ququ_metadata*)malloc(sizeof(ququ_metadata));
-	if (filter->metadata == NULL) {
-		perror("Can't allocate memory for metadata");
-		exit(EXIT_FAILURE);
-	}
+ququ_filter * ququ_init(uint64_t nslots) {
+  ququ_filter *filter;
+  
 	uint64_t total_blocks = (nslots + QUQU_SLOTS_PER_BLOCK)/QUQU_SLOTS_PER_BLOCK;
+  uint64_t total_size_in_bytes = sizeof(ququ_block) * total_blocks;
 
-	filter->metadata->total_size_in_bytes = sizeof(ququ_block) * total_blocks;
-	filter->metadata->seed = SEED;
-	filter->metadata->nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
-	filter->metadata->key_remainder_bits = 8;
-	filter->metadata->range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata->key_remainder_bits);
-	filter->metadata->nblocks = total_blocks;
-	filter->metadata->nelts = 0;
+  filter = (ququ_filter *)malloc(sizeof(*filter) + total_size_in_bytes);
+  assert(filter);
+  
+	filter->metadata.total_size_in_bytes = total_size_in_bytes;
+	filter->metadata.seed = SEED;
+	filter->metadata.nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
+	filter->metadata.key_remainder_bits = 8;
+	filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
+	filter->metadata.nblocks = total_blocks;
+	filter->metadata.nelts = 0;
 
-	filter->blocks = (ququ_block*)malloc(filter->metadata->total_size_in_bytes);
-	if (filter->metadata == NULL) {
-		perror("Can't allocate memory for blocks");
-		exit(EXIT_FAILURE);
-	}
 	// memset to 1
 	for (uint64_t i = 0; i < total_blocks; i++) {
 		__uint128_t set_vector = UINT64_MAX;
@@ -221,7 +215,7 @@ int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
 		filter->blocks[i].md = set_vector;
 	}
 
-	return 0;
+	return filter;
 }
 
 // If the item goes in the i'th slot (starting from 0) in the block then
@@ -229,18 +223,18 @@ int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
 // by 1 bit.
 // Insert the new tag at the end of its run and shift the rest by 1 slot.
 int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
-	ququ_metadata * restrict metadata           = filter->metadata;
+	ququ_metadata * restrict metadata           = &filter->metadata;
 	ququ_block    * restrict blocks             = filter->blocks;
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	__uint128_t              range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
-  __uint128_t block_md         = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+  __uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
   
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-  __uint128_t alt_block_md     = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+  __uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
 
 	uint64_t block_free     =	get_block_free_space(block_md);
 	uint64_t alt_block_free =	get_block_free_space(alt_block_md);
@@ -296,11 +290,11 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter * restrict filter, __uint128_t hash) {
-	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
-	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
+	uint64_t tag = hash & BITMASK(filter->metadata.key_remainder_bits);
+	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
-															filter->metadata->range) >>
-		filter->metadata->key_remainder_bits;
+															filter->metadata.range) >>
+		filter->metadata.key_remainder_bits;
 
 	bool ret = check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
 																																	alt_block_index);
