@@ -16,6 +16,7 @@
 #include <stdbool.h>
 
 #ifdef __cplusplus
+#define restrict __restrict__
 extern "C" {
 #endif
 
@@ -43,15 +44,15 @@ extern "C" {
 	} ququ_metadata;
 
 	typedef struct ququ_filter {
-		ququ_metadata *metadata;
-		ququ_block *blocks;
+		ququ_metadata * restrict metadata;
+		ququ_block * restrict blocks;
 	} ququ_filter;
 
-	int ququ_init(ququ_filter *filter, uint64_t nslots);
+	int ququ_init(ququ_filter * restrict filter, uint64_t nslots);
 
-	int ququ_insert(ququ_filter *filter, __uint128_t hash);
+	int ququ_insert(ququ_filter * restrict filter, __uint128_t hash);
 
-	bool ququ_is_present(ququ_filter *filter, __uint128_t hash);
+	bool ququ_is_present(ququ_filter * restrict filter, __uint128_t hash);
 
 #ifdef __cplusplus
 }

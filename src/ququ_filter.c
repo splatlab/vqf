@@ -51,7 +51,7 @@ static inline uint64_t word_select(uint64_t val, int rank) {
 
 // select(vec, 0) -> -1
 // select(vec, i) -> 128, if i > popcnt(vec)
-int64_t select_128(__uint128_t vector, uint64_t rank) {
+static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
 	uint64_t lower_word = vector & BITMASK(64);
 	uint64_t lower_rank = word_rank(lower_word);
 	if (lower_rank > rank) {
@@ -107,7 +107,7 @@ inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle
         _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E), _mm256_add_epi8(shuffle, K1)));
 }
 
-void shuffle_256(uint8_t *source, uint8_t *map) {
+void shuffle_256(uint8_t * restrict source, uint8_t * restrict map) {
 	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
 	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(map));
 
@@ -116,13 +116,13 @@ void shuffle_256(uint8_t *source, uint8_t *map) {
 }
 
 #if 1
-void update_tags(ququ_block *block, uint8_t index, uint8_t tag) {
+static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
 	memmove(&block->tags[index + 1], &block->tags[index], 50 - index);
 	block->tags[index] = tag;
 }
 
 #else
-void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
+static inline void update_tags(uint8_t * restrict block, uint8_t index, uint8_t tag) {
 	index = index + 13;		// offset index based on the md size
 	if (index < SHUFFLE_SIZE) {	// change in the first 32-bytes. Must move both halves.
 		/*Move first 32-bytes*/
@@ -174,7 +174,7 @@ void update_tags(uint8_t *block, uint8_t index, uint8_t tag) {
 }
 #endif
 
-__uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
+static inline __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
   static const __uint128_t one = 1;
   
   __uint128_t unshifted_mask = (one << index) - 1;
@@ -185,7 +185,7 @@ __uint128_t update_md(__uint128_t md, uint8_t index, uint8_t bit) {
 }
 
 // number of 0s in the metadata is the number of tags.
-uint64_t get_block_load(__uint128_t vector) {
+static inline uint64_t get_block_load(__uint128_t vector) {
 	uint64_t lower_word = vector & BITMASK(64);
 	uint64_t higher_word = vector >> 64;
 	uint64_t popcnt = word_rank(lower_word) + word_rank(higher_word);
@@ -195,7 +195,7 @@ uint64_t get_block_load(__uint128_t vector) {
 // Create n/log(n) blocks of log(n) slots.
 // log(n) is 51 given a cache line size.
 // n/51 blocks.
-int ququ_init(ququ_filter *filter, uint64_t nslots) {
+int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
 	assert(word_rank(nslots) == 1); /* nslots must be a power of 2 */
 
 	filter->metadata = (ququ_metadata*)malloc(sizeof(ququ_metadata));
@@ -239,48 +239,52 @@ int ququ_init(ququ_filter *filter, uint64_t nslots) {
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
 // by 1 bit.
 // Insert the new tag at the end of its run and shift the rest by 1 slot.
-int ququ_insert(ququ_filter *filter, __uint128_t hash) {
-	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
-	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
-	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
-															filter->metadata->range) >>
-		filter->metadata->key_remainder_bits;
+int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
+  ququ_metadata * restrict metadata           = filter->metadata;
+  ququ_block    * restrict blocks             = filter->blocks;
+  uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
+  __uint128_t              range              = metadata->range;
+  
+	uint64_t tag = hash & BITMASK(key_remainder_bits);
+	uint64_t block_index = hash >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
-	uint64_t primary_load =	get_block_load(filter->blocks[block_index /
-																				 QUQU_SLOTS_PER_BLOCK].md); 
-	uint64_t alt_load =	get_block_load(filter->blocks[alt_block_index /
-																		 QUQU_SLOTS_PER_BLOCK].md);
-	if (primary_load == QUQU_SLOTS_PER_BLOCK && alt_load ==
-			QUQU_SLOTS_PER_BLOCK) {
-		fprintf(stderr, "ququ filter is full.");
-		exit(EXIT_FAILURE);
-	}
+	uint64_t primary_load =	get_block_load(blocks[block_index     / QUQU_SLOTS_PER_BLOCK].md);
+	uint64_t     alt_load =	get_block_load(blocks[alt_block_index / QUQU_SLOTS_PER_BLOCK].md);
+  
 	// pick the least loaded block
 	if (alt_load < primary_load) {
 		block_index = alt_block_index;
+	} else if (primary_load == QUQU_SLOTS_PER_BLOCK) {
+		fprintf(stderr, "ququ filter is full.");
+		exit(EXIT_FAILURE);
 	}
 
 	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
 
-	uint64_t select_index = select_128(filter->blocks[index].md, offset);
+	uint64_t select_index = select_128(blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
-	
+
+  ququ_block block = blocks[index];
+
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
 
 #if 1
-	update_tags(&filter->blocks[index], slot_index,	tag);
+	update_tags(&block, slot_index,	tag);
 #else
-	update_tags(reinterpret_cast<uint8_t*>(&filter->blocks[index]), slot_index,
-							tag);
+	update_tags(reinterpret_cast<uint8_t*>(&block), slot_index,tag);
 #endif
-	filter->blocks[index].md = update_md(filter->blocks[index].md, select_index, 0);
+	blocks[index].md = update_md(block.md, select_index, 0);
+
+  blocks[index] = block;
+  
 	/*print_block(filter, index);*/
 	return 0;
 }
 
-bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
+static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64_t block_index) {
 	uint64_t index = block_index / QUQU_SLOTS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_SLOTS_PER_BLOCK;
 
@@ -301,7 +305,7 @@ bool check_tags(ququ_filter *filter, uint8_t tag, uint64_t block_index) {
 
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
-bool ququ_is_present(ququ_filter *filter, __uint128_t hash) {
+bool ququ_is_present(ququ_filter * restrict filter, __uint128_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata->key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata->key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
