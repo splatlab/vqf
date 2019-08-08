@@ -89,9 +89,9 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
 	__uint128_t md = filter->blocks[block_index].md;
-	print_bits(md, 102);
+	print_bits(md, 128);
 	printf("tags: ");
-	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 51);
+	print_tags(reinterpret_cast<uint8_t *>(&filter->blocks[block_index].tags), 48);
 }
 
 const __m256i K0 = _mm256_setr_epi8(
@@ -234,18 +234,18 @@ int ququ_init(ququ_filter * restrict filter, uint64_t nslots) {
 // by 1 bit.
 // Insert the new tag at the end of its run and shift the rest by 1 slot.
 int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
-  ququ_metadata * restrict metadata           = filter->metadata;
-  ququ_block    * restrict blocks             = filter->blocks;
-  uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
-  __uint128_t              range              = metadata->range;
-  
+	ququ_metadata * restrict metadata           = filter->metadata;
+	ququ_block    * restrict blocks             = filter->blocks;
+	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
+	__uint128_t              range              = metadata->range;
+
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	uint64_t primary_load =	get_block_load(blocks[block_index     / QUQU_BUCKETS_PER_BLOCK].md);
 	uint64_t     alt_load =	get_block_load(blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK].md);
-  
+
 	// pick the least loaded block
 	if (alt_load < primary_load) {
 		block_index = alt_block_index;
@@ -260,7 +260,7 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 	uint64_t select_index = select_128(blocks[index].md, offset);
 	uint64_t slot_index = select_index - offset;
 
-  ququ_block block = blocks[index];
+	ququ_block block = blocks[index];
 
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
@@ -270,10 +270,10 @@ int ququ_insert(ququ_filter * restrict filter, __uint128_t hash) {
 #else
 	update_tags(reinterpret_cast<uint8_t*>(&block), slot_index,tag);
 #endif
-	blocks[index].md = update_md(block.md, select_index, 0);
+	block.md = update_md(block.md, select_index, 0);
 
-  blocks[index] = block;
-  
+	blocks[index] = block;
+
 	/*print_block(filter, index);*/
 	return 0;
 }
