@@ -11,16 +11,16 @@ endif
 ifdef NH
 	ARCH=
 else
-	ARCH=-msse4.2 -D__SSE4_2_
+	ARCH=-msse4.2
 endif
 
 ifdef P
 	PROFILE=-pg -no-pie # for bug in gprof.
 endif
 
-CXX = g++ -std=c++11 -mavx2 -frename-registers -march=native
-CC = gcc -std=gnu11 -mavx2 -frename-registers -march=native
-LD= g++ -std=c++11 -mavx2 -frename-registers -march=native
+CXX = g++ -std=c++11 -mavx512f -frename-registers -march=native
+CC = gcc -std=gnu11 -mavx512f -frename-registers -march=native
+LD= g++ -std=c++11
 
 LOC_INCLUDE=include
 LOC_SRC=src

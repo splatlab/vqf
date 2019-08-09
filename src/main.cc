@@ -9,6 +9,7 @@
  * ============================================================================
  */
 
+#include <iostream>
 #include <stdint.h>
 #include <stdio.h>
 #include <immintrin.h>  // portable to all x86 compilers
@@ -35,7 +36,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 int main(int argc, char **argv)
 {
-#if 1
+#if 0
 	if (argc < 2) {
 		fprintf(stderr, "Please specify the log of the number of slots in the CQF.\n");
 		exit(1);
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
 	puts("");
 
 #else
-#define SIZE 32
+#define SIZE 64
 	uint8_t source[SIZE];
 	uint8_t order[SIZE];
 	for (uint8_t i = 0; i < SIZE; i++) {
@@ -107,12 +108,12 @@ int main(int argc, char **argv)
 		std::cout << (uint32_t)source[i] << " ";
 	std::cout << "\n";
 
-	__m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source));
-	__m256i shuffle = _mm256_loadu_si256(reinterpret_cast<__m256i*>(order));
+	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(source));
+	__m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(order));
 
-	vector = _mm256_shuffle_epi8(vector, shuffle);
+	vector = _mm512_shuffle_epi8(vector, shuffle);
 	//vector = Shuffle(vector, shuffle);
-	_mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector);
+	_mm512_storeu_si512(reinterpret_cast<__m512i*>(source), vector);
 
 	std::cout << "vector after shuffle: \n";
 	for (uint8_t i = 0; i < SIZE; i++)
