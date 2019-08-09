@@ -33,7 +33,6 @@ extern "C" {
 
 	typedef struct ququ_metadata {
 		uint64_t total_size_in_bytes;
-		uint32_t seed;
 		uint64_t key_remainder_bits;
 		uint64_t range;
 		uint64_t nblocks;

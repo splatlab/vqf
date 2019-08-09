@@ -23,7 +23,6 @@
 #define BITMASK(nbits)                                    \
   ((nbits) == 64 ? 0xffffffffffffffff : MAX_VALUE(nbits))
 
-#define SEED 2038074761
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
 
@@ -199,7 +198,6 @@ ququ_filter * ququ_init(uint64_t nslots) {
   assert(filter);
   
 	filter->metadata.total_size_in_bytes = total_size_in_bytes;
-	filter->metadata.seed = SEED;
 	filter->metadata.nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
 	filter->metadata.key_remainder_bits = 8;
 	filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
