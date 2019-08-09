@@ -158,6 +158,7 @@ ququ_filter * ququ_init(uint64_t nslots) {
   uint64_t total_size_in_bytes = sizeof(ququ_block) * total_blocks;
 
   filter = (ququ_filter *)malloc(sizeof(*filter) + total_size_in_bytes);
+	printf("Size: %ld\n",total_size_in_bytes);
   assert(filter);
   
 	filter->metadata.total_size_in_bytes = total_size_in_bytes;
