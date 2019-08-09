@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
-		//vals[i] = rand() % filter.metadata->range;
+		//vals[i] = rand() % filter->metadata.range;
 		vals[i] = (1 * vals[i]) % filter->metadata.range;
 	}
 
