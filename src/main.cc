@@ -86,6 +86,7 @@ int main(int argc, char **argv)
 	}
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Lookup:", &start, &end);
+	puts("");
 
 #else
 #define SIZE 32
