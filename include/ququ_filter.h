@@ -26,7 +26,6 @@ extern "C" {
 
 	// We are using 8-bit slots.
 	// One block consists of 48 8-bit slots covering 80 buckets, and 80+48 = 128 bits of metadata.
-  
 	typedef struct __attribute__ ((__packed__)) ququ_block {
 		__uint128_t md;
 		uint8_t tags[48];

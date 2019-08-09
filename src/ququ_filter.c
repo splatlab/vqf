@@ -227,12 +227,12 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t                 range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
-  __uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
-  
+
 	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-  __uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+	__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
 
 	uint64_t block_free     =	get_block_free_space(block_md);
 	uint64_t alt_block_free =	get_block_free_space(alt_block_md);
@@ -240,7 +240,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	// pick the least loaded block
 	if (alt_block_free > block_free) {
 		block_index = alt_block_index;
-    block_md = alt_block_md;
+		block_md = alt_block_md;
 	} else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
 		fprintf(stderr, "ququ filter is full.");
 		exit(EXIT_FAILURE);

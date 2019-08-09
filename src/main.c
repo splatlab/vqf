@@ -72,10 +72,6 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-		//if (!ququ_is_present(&filter, vals[i])) {
-			//fprintf(stderr, "Lookup failed for %ld", vals[i]);
-			//exit(EXIT_FAILURE);
-		//}
 	}
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion:", &start, &end);
