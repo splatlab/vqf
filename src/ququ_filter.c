@@ -88,7 +88,7 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
 
-#if 0
+#if 1
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
 	memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
 	block->tags[index] = tag;
@@ -217,7 +217,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
 
-#if 0
+#if 1
 	update_tags(&blocks[index], slot_index,	tag);
 #else
 	update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
