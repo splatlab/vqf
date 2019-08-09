@@ -20,7 +20,7 @@ endif
 
 CXX = g++ -std=c++11 -mavx2
 CC = gcc -std=gnu11 -mavx2
-LD= gcc -std=c++11
+LD= g++ -std=c++11
 
 LOC_INCLUDE=include
 LOC_SRC=src
@@ -43,7 +43,7 @@ main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o
 bm:							$(OBJDIR)/bm.o $(OBJDIR)/ququ_filter.o
 
 # dependencies between .o files and .cc (or .c) files
-$(OBJDIR)/main.o: 			$(LOC_SRC)/main.c
+$(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
 $(OBJDIR)/bm.o: 			$(LOC_SRC)/bm.cc
 
 $(OBJDIR)/ququ_filter.o: 			$(LOC_SRC)/ququ_filter.c
@@ -56,10 +56,10 @@ $(TARGETS):
 	$(LD) $^ $(LDFLAGS) -o $@
 
 $(OBJDIR)/%.o: $(LOC_SRC)/%.cc | $(OBJDIR)
-	$(CC) $(CXXFLAGS) $(INCLUDE) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -c -o $@ $<
 
 $(OBJDIR)/%.o: $(LOC_SRC)/%.c | $(OBJDIR)
-	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+	$(CXX) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
