@@ -12,6 +12,7 @@
 #include <iostream>
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 #include <openssl/rand.h>
@@ -56,8 +57,16 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
-	srand(0);
+	uint64_t offset = 0;
+	while (sizeof(*vals) * nvals > (1ULL << 30)) {
+		uint64_t chunk = 30 - log2(sizeof(*vals));
+		RAND_bytes((unsigned char *)(vals + offset), sizeof(*vals) * (1ULL << chunk));
+		offset += (1ULL << chunk);
+		nvals -= (1ULL << chunk);
+	}
+	RAND_bytes((unsigned char *)(vals + offset), sizeof(*vals) * nvals);
+	
+	//srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
 		//vals[i] = rand() % filter->metadata.range;
 		vals[i] = (1 * vals[i]) % filter->metadata.range;

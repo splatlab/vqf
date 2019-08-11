@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <openssl/rand.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -81,8 +82,17 @@ void *uniform_pregen_init(uint64_t maxoutputs, __uint128_t maxvalue,
   state->outputs =
       (__uint128_t *)malloc(state->maxoutputs * sizeof(state->outputs[0]));
   assert(state->outputs != NULL);
-  RAND_bytes((unsigned char *)state->outputs,
-                    sizeof(*state->outputs) * state->maxoutputs);
+	uint64_t offset = 0;
+	uint64_t nvals = state->maxoutputs;
+	while (sizeof(*state->outputs) * nvals > (1ULL << 30)) {
+		uint64_t chunk = 30 - log2(sizeof(*state->outputs));
+		RAND_bytes((unsigned char *)(state->outputs + offset),
+							 sizeof(*state->outputs) * (1ULL << chunk));
+		offset += (1ULL << chunk);
+		nvals -= (1ULL << chunk);
+	}
+	RAND_bytes((unsigned char *)(state->outputs + offset),
+										sizeof(*state->outputs) * nvals);
   for (i = 0; i < state->maxoutputs; i++)
     state->outputs[i] = (1 * state->outputs[i]) % maxvalue;
 
