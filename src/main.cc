@@ -57,14 +57,14 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	uint64_t offset = 0;
-	while (sizeof(*vals) * nvals > (1ULL << 30)) {
-		uint64_t chunk = 30 - log2(sizeof(*vals));
-		RAND_bytes((unsigned char *)(vals + offset), sizeof(*vals) * (1ULL << chunk));
-		offset += (1ULL << chunk);
-		nvals -= (1ULL << chunk);
+  uint64_t nbytes = sizeof(*vals) * nvals;
+  uint8_t *ptr = (uint8_t *)vals;
+	while (nbytes > (1ULL << 30)) {
+		RAND_bytes(ptr, 1ULL << 30);
+		ptr += (1ULL << 30);
+		nbytes -= (1ULL << 30);
 	}
-	RAND_bytes((unsigned char *)(vals + offset), sizeof(*vals) * nvals);
+	RAND_bytes(ptr, nbytes);
 	
 	//srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
