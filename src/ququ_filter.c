@@ -193,7 +193,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
 
-	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 	__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
 
 	uint64_t block_free     =	get_block_free_space(block_md);
@@ -252,7 +252,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata.key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
-	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) %
 															filter->metadata.range) >>
 		filter->metadata.key_remainder_bits;
 

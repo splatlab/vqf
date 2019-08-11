@@ -36,7 +36,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 int main(int argc, char **argv)
 {
-#if 0
+#if 1
 	if (argc < 2) {
 		fprintf(stderr, "Please specify the log of the number of slots in the CQF.\n");
 		exit(1);
