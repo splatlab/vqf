@@ -30,31 +30,34 @@
 #define QUQU_CHECK_ALT 92
 
 static inline int word_rank(uint64_t val) {
-	asm("popcnt %[val], %[val]"
-			: [val] "+r" (val)
-			:
-			: "cc");
-	return val;
+	return __builtin_popcountll(val);
+	/*asm("popcnt %[val], %[val]"*/
+			/*: [val] "+r" (val)*/
+			/*:*/
+			/*: "cc");*/
+	/*return val;*/
 }
 
 // Returns the position of the rank'th 1.  (rank = 0 returns the 1st 1)
 // Returns 64 if there are fewer than rank+1 1s.
 static inline uint64_t word_select(uint64_t val, int rank) {
 	uint64_t i = 1ULL << rank;
-	asm("pdep %[val], %[mask], %[val]"
-			: [val] "+r" (val)
-			: [mask] "r" (i));
-	asm("tzcnt %[bit], %[index]"
-			: [index] "=r" (i)
-			: [bit] "g" (val)
-			: "cc");
-	return i;
+	val = _pdep_u64(i, val);
+	return _tzcnt_u64(val);
+	/*asm("pdep %[val], %[mask], %[val]"*/
+			/*: [val] "+r" (val)*/
+			/*: [mask] "r" (i));*/
+	/*asm("tzcnt %[bit], %[index]"*/
+			/*: [index] "=r" (i)*/
+			/*: [bit] "g" (val)*/
+			/*: "cc");*/
+	/*return i;*/
 }
 
 // select(vec, 0) -> -1
 // select(vec, i) -> 128, if i > popcnt(vec)
 static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
-	uint64_t lower_word = vector & BITMASK(64);
+	uint64_t lower_word = vector & 0xffffffffffffffff;
 	uint64_t lower_rank = word_rank(lower_word);
 	if (lower_rank > rank) {
 		return word_select(lower_word, rank);
@@ -145,7 +148,7 @@ static inline __uint128_t update_md(__uint128_t md, uint8_t index) {
 
 // number of 0s in the metadata is the number of tags.
 static inline uint64_t get_block_free_space(__uint128_t vector) {
-	uint64_t lower_word = vector & BITMASK(64);
+	uint64_t lower_word = vector & 0xffffffffffffffff;
 	uint64_t higher_word = vector >> 64;
 	return word_rank(lower_word) + word_rank(higher_word);
 }
@@ -192,7 +195,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
 	uint64_t block_index = hash >> key_remainder_bits;
 	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
-	uint64_t tag = hash & BITMASK(key_remainder_bits);
+	uint64_t tag = hash & 0xff;
 	uint64_t block_free     =	get_block_free_space(block_md);
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
@@ -253,7 +256,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
-	uint64_t tag = hash & BITMASK(filter->metadata.key_remainder_bits);
+	uint64_t tag = hash & 0xff;
 	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) %
 															filter->metadata.range) >>
