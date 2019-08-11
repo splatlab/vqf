@@ -27,6 +27,7 @@
 
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
+#define QUQU_CHECK_ALT 92
 
 static inline int word_rank(uint64_t val) {
 	asm("popcnt %[val], %[val]"
@@ -60,7 +61,7 @@ static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
 	} else {
 		rank = rank - lower_rank;
 		uint64_t higher_word = vector >> 64;
-    return word_select(higher_word, rank) + 64;
+                return word_select(higher_word, rank) + 64;
 	}
 }
 
@@ -88,7 +89,7 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
 
-#if 0
+#if 1
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
 	memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
 	block->tags[index] = tag;
@@ -106,6 +107,7 @@ const __m256i K1 = _mm256_setr_epi8(
 
 const __m256i K[] = {K0, K1};
 
+#define QUQU_CHECK_ALT 92
 inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle) 
 { 
  	 return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle, K[0])), 
@@ -190,23 +192,24 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
 	uint64_t block_index = hash >> key_remainder_bits;
 	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
-
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
-
-	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-	__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
-
 	uint64_t block_free     =	get_block_free_space(block_md);
-	uint64_t alt_block_free =	get_block_free_space(alt_block_md);
+        uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
-	// pick the least loaded block
-	if (alt_block_free > block_free) {
-		block_index = alt_block_index;
-		block_md = alt_block_md;
-	} else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
-		fprintf(stderr, "ququ filter is full.");
-		exit(EXIT_FAILURE);
-	}
+        __builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
+
+        if (block_free < QUQU_CHECK_ALT) {
+           __uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+           uint64_t alt_block_free =	get_block_free_space(alt_block_md);
+           // pick the least loaded block
+           if (alt_block_free > block_free) {
+                   block_index = alt_block_index;
+                   block_md = alt_block_md;
+           } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
+                   fprintf(stderr, "ququ filter is full.");
+                   exit(EXIT_FAILURE);
+           }
+        }
 
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
@@ -217,7 +220,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	/*printf("tag: %ld offset: %ld\n", tag, offset);*/
 	/*print_block(filter, index);*/
 
-#if 0
+#if 1
 	update_tags(&blocks[index], slot_index,	tag);
 #else
 	update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
