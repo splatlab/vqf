@@ -194,22 +194,22 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & BITMASK(key_remainder_bits);
 	uint64_t block_free     =	get_block_free_space(block_md);
-        uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
-        __builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
+	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-        if (block_free < QUQU_CHECK_ALT) {
-           __uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
-           uint64_t alt_block_free =	get_block_free_space(alt_block_md);
-           // pick the least loaded block
-           if (alt_block_free > block_free) {
-                   block_index = alt_block_index;
-                   block_md = alt_block_md;
-           } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
-                   fprintf(stderr, "ququ filter is full.");
-                   exit(EXIT_FAILURE);
-           }
-        }
+	if (block_free < QUQU_CHECK_ALT) {
+		__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+		uint64_t alt_block_free =	get_block_free_space(alt_block_md);
+		// pick the least loaded block
+		if (alt_block_free > block_free) {
+			block_index = alt_block_index;
+			block_md = alt_block_md;
+		} else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
+			fprintf(stderr, "ququ filter is full.");
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
@@ -255,7 +255,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t tag = hash & BITMASK(filter->metadata.key_remainder_bits);
 	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
-	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) %
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) %
 															filter->metadata.range) >>
 		filter->metadata.key_remainder_bits;
 
