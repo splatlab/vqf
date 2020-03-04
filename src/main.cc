@@ -120,7 +120,8 @@ int main(int argc, char **argv)
 	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(source));
 	__m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(order));
 
-	vector = _mm512_shuffle_epi8(vector, shuffle);
+	vector = _mm512_permutexvar_epi8(vector, shuffle);
+	//vector = _mm512_shuffle_epi8(vector, shuffle);
 	//vector = Shuffle(vector, shuffle);
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(source), vector);
 

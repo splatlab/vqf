@@ -18,7 +18,8 @@
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 
-#include "shuffle_matrix.h"
+#include "shuffle_matrix_256.h"
+/*#include "shuffle_matrix_512.h"*/
 #include "ququ_filter.h"
 
 #define MAX_VALUE(nbits) ((1ULL << (nbits)) - 1)
@@ -99,6 +100,15 @@ static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8
 }
 
 #else
+
+static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
+																	 uint8_t tag) {
+	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
+	__m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(SHUFFLE[index]));
+
+	vector = _mm512_permutexvar_epi8(vector, shuffle);
+	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
+}
 
 const __m256i K0 = _mm256_setr_epi8( 
 		0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 
