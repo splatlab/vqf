@@ -107,9 +107,7 @@ static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 	block->tags[47] = tag;	// add tag at the end
 
         __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
-
 	vector = _mm512_permutexvar_epi8(SHUFFLE[index], vector);
-
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
