@@ -19,6 +19,7 @@
 #include <sys/time.h>
 
 #include "ququ_filter.h"
+#include "shuffle_matrix_512.h"
 
 /* Print elapsed time using the start and end timeval */
 void print_time_elapsed(const char* desc, struct timeval* start, struct
@@ -102,33 +103,45 @@ int main(int argc, char **argv)
 #define SIZE 64
 	uint8_t source[SIZE];
 	uint8_t order[SIZE];
-	for (uint8_t i = 0; i < SIZE; i++) {
-		source[i] = i;
-		order[i] = SIZE-i-1;
-	}
 
-	std::cout << "order vector: \n";
-	for (uint8_t i = 0; i < SIZE; i++)
-		std::cout << (uint32_t)order[i] << " ";
-	std::cout << "\n";
+        for (int idx = 16; idx < 17; idx++) {
+           std::cout << "index: " << idx << "\n"; 
+           for (uint8_t i = 0; i < SIZE; i++) {
+#if 1
+              if (i < 16)
+                 source[i] = 255;
+              else if (i == SIZE -1)
+                 source[i] = 201;
+               else 
+              source[i] = 0;
+#else
+               source[i] = i;
+#endif
+           }
+           _mm512_storeu_si512(reinterpret_cast<__m512i*>(order), SHUFFLE[idx]);
+           std::cout << "order vector: \n";
+           for (uint8_t i = 0; i < SIZE; i++)
+              std::cout << (uint32_t)order[i] << " ";
+           std::cout << "\n";
 
-	std::cout << "vector before shuffle: \n";
-	for (uint8_t i = 0; i < SIZE; i++)
-		std::cout << (uint32_t)source[i] << " ";
-	std::cout << "\n";
+           std::cout << "vector before shuffle: \n";
+           for (uint8_t i = 0; i < SIZE; i++)
+              std::cout << (uint32_t)source[i] << " ";
+           std::cout << "\n";
 
-	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(source));
-	__m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(order));
+           __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(source));
+           __m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(order));
 
-	vector = _mm512_permutexvar_epi8(vector, shuffle);
-	//vector = _mm512_shuffle_epi8(vector, shuffle);
-	//vector = Shuffle(vector, shuffle);
-	_mm512_storeu_si512(reinterpret_cast<__m512i*>(source), vector);
+           vector = _mm512_permutexvar_epi8(shuffle, vector);
+           //vector = _mm512_shuffle_epi8(vector, shuffle);
+           //vector = Shuffle(vector, shuffle);
+           _mm512_storeu_si512(reinterpret_cast<__m512i*>(source), vector);
 
-	std::cout << "vector after shuffle: \n";
-	for (uint8_t i = 0; i < SIZE; i++)
-		std::cout << (uint32_t)source[i] << " ";
-	std::cout << "\n";
+           std::cout << "vector after shuffle: \n";
+           for (uint8_t i = 0; i < SIZE; i++)
+              std::cout << (uint32_t)source[i] << " ";
+           std::cout << "\n";
+        }
 #endif
 	return 0;
 }

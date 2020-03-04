@@ -17,6 +17,7 @@
 #include <sstream>
 #include <iomanip>
 
+/*
 #define SHUFFLE_SIZE 32
 
 void generate_shuffle_256(void) {
@@ -78,6 +79,8 @@ void generate_shuffle_256(void) {
 	shuffle_matrix << "};\n";
 }
 
+*/
+
 #define SHUFFLE_SIZE 64
 
 void generate_shuffle_512(void) {
@@ -85,12 +88,12 @@ void generate_shuffle_512(void) {
 
 	// generate right shuffle
 	for (uint64_t index = 0; index < SHUFFLE_SIZE; index++) {
-		shuffle_matrix << "const __m512i S" << std::to_string(index) << " = _mm512_setr_epi8(\n";
-		for (uint8_t i = 0, j = 0; i < SHUFFLE_SIZE; i++) {
-			if (i == index) {
+		shuffle_matrix << "const __m512i S" << std::to_string(index) << " = _mm512_set_epi8(\n";
+		for (uint8_t i = 0, j = SHUFFLE_SIZE - 2; i < SHUFFLE_SIZE; i++) {
+			if (i == SHUFFLE_SIZE - index - 1) {
 				shuffle_matrix << std::to_string(SHUFFLE_SIZE - 1);
 			} else {
-				shuffle_matrix << std::to_string(j++);
+				shuffle_matrix << std::to_string(j--);
 			}
 			if (i < SHUFFLE_SIZE - 1)
 				shuffle_matrix << ", ";
@@ -99,9 +102,6 @@ void generate_shuffle_512(void) {
 	}
 	shuffle_matrix << '\n';
 	shuffle_matrix << "const __m512i SHUFFLE [] = {";
-	for (uint8_t i = 0; i < SHUFFLE_SIZE; i++) {
-		shuffle_matrix << "S" << std::to_string(0) << ", ";
-	}
 	for (uint8_t i = 0; i < SHUFFLE_SIZE; i++) {
 		shuffle_matrix << "S" << std::to_string(i);
 		if (i < SHUFFLE_SIZE - 1)

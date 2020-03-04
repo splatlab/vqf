@@ -19,7 +19,7 @@
 #include <tmmintrin.h>
 
 #include "shuffle_matrix_256.h"
-/*#include "shuffle_matrix_512.h"*/
+#include "shuffle_matrix_512.h"
 #include "ququ_filter.h"
 
 #define MAX_VALUE(nbits) ((1ULL << (nbits)) - 1)
@@ -93,7 +93,7 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
 
-#if 1
+#if 0
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
 	memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
 	block->tags[index] = tag;
@@ -103,10 +103,13 @@ static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8
 
 static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 																	 uint8_t tag) {
-	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
-	__m512i shuffle = _mm512_loadu_si512(reinterpret_cast<__m512i*>(SHUFFLE[index]));
+	index = index + sizeof(__uint128_t);	// offset index based on md field.
+	block->tags[47] = tag;	// add tag at the end
 
-	vector = _mm512_permutexvar_epi8(vector, shuffle);
+        __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
+
+	vector = _mm512_permutexvar_epi8(SHUFFLE[index], vector);
+
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
@@ -233,13 +236,14 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	/*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
 	/*print_block(filter, index);*/
 
-#if 1
+#if 0
 	update_tags(&blocks[index], slot_index,	tag);
 #else
-	update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
+	//update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
+	update_tags_512(&blocks[index], slot_index,tag);
 #endif
 	blocks[index].md = update_md(block_md, select_index);
-
+        
 	/*print_block(filter, index);*/
 	return 0;
 }
