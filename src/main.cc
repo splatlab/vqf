@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 	}
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
-	puts("");
+//	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
 		if (!ququ_is_present(filter, vals[i])) {
@@ -155,6 +155,8 @@ int main(int argc, char **argv)
 
 #else
 #define SIZE 64
+
+#if 0
 	uint8_t source[SIZE];
 	uint8_t order[SIZE];
 
@@ -172,6 +174,7 @@ int main(int argc, char **argv)
                source[i] = i;
 #endif
            }
+
            _mm512_storeu_si512(reinterpret_cast<__m512i*>(order), SHUFFLE[idx]);
            std::cout << "order vector: \n";
            for (uint8_t i = 0; i < SIZE; i++)
@@ -196,6 +199,41 @@ int main(int argc, char **argv)
               std::cout << (uint32_t)source[i] << " ";
            std::cout << "\n";
         }
+#endif
+
+	uint8_t block_vec[SIZE];
+	uint8_t tag_vec[SIZE];
+      __m128i   tmp    = _mm_set1_epi8(7);
+      __m512i   bcast  = _mm512_broadcastb_epi8(tmp);
+
+      _mm512_storeu_si512(reinterpret_cast<__m512i*>(tag_vec), bcast);
+      std::cout << "Tag vector: \n";
+      for (uint8_t i = 0; i < SIZE; i++)
+         std::cout << (uint32_t)tag_vec[i] << " ";
+      std::cout << "\n";
+
+
+      uint8_t start = 25;
+      uint8_t end = 52;
+      for (uint8_t i = 0; i < SIZE; i++) {
+         if (i >= start && i < end)
+            block_vec[i] = 8;
+         else
+            block_vec[i] = 7;
+      }
+      std::cout << "Block vector: \n";
+      for (uint8_t i = 0; i < SIZE; i++)
+         std::cout << (uint32_t)block_vec[i] << " ";
+      std::cout << "\n";
+
+      __m512i   block  = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&block_vec));
+
+      __mmask64 k1     = _cvtu64_mask64(((1ULL << start) - 1) ^ ((1ULL << end) - 1));
+      __mmask64 result = _mm512_mask_cmp_epi8_mask(k1, bcast, block, _MM_CMPINT_EQ);
+
+
+      bool ret = result != 0;
+      std::cout << ret << '\n';
 #endif
 	return 0;
 }

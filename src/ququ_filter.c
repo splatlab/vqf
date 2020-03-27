@@ -258,11 +258,22 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 	}
 	end = select_128(filter->blocks[index].md, offset) - offset;
 
+#if 0
+      __m128i   tmp    = _mm_set1_epi8(tag);
+      __m512i   bcast  = _mm512_broadcastb_epi8(tmp);
+      __m512i   block  = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+      start += sizeof(__uint128_t);
+      end += sizeof(__uint128_t);
+      __mmask64 k1     = _cvtu64_mask64(((1ULL << start) - 1) ^ ((1ULL << end) - 1));
+      __mmask64 result = _mm512_mask_cmp_epi8_mask(k1, bcast, block, _MM_CMPINT_EQ);
+      return result != 0;
+#else
 	for (uint64_t i = start; i < end; i++) {
 		if (tag == filter->blocks[index].tags[i])
 			return true;
 	}
-	return false;
+        return false;
+#endif
 }
 
 // If the item goes in the i'th slot (starting from 0) in the block then
