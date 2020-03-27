@@ -257,7 +257,6 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 		start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
 	}
 	end = select_128(filter->blocks[index].md, offset) - offset;
-
 #if 0
       __m128i   tmp    = _mm_set1_epi8(tag);
       __m512i   bcast  = _mm512_broadcastb_epi8(tmp);
