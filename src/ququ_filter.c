@@ -258,11 +258,14 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 	}
 	end = select_128(filter->blocks[index].md, offset) - offset;
 #if 1
-      __m512i   bcast  = _mm512_set1_epi8(tag);
-      __m512i   block  = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-      uint64_t  mask   = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
-      __mmask64 result = _mm512_mask_cmp_epi8_mask(mask, bcast, block, _MM_CMPINT_EQ);
-      return result != 0;
+  if (start == end)
+    return 0;
+  
+  __m512i   bcast  = _mm512_set1_epi8(tag);
+  __m512i   block  = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+  uint64_t  mask   = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
+  __mmask64 result = _mm512_mask_cmp_epi8_mask(mask, bcast, block, _MM_CMPINT_EQ);
+  return result != 0;
 #else
 	for (uint64_t i = start; i < end; i++) {
 		if (tag == filter->blocks[index].tags[i])
