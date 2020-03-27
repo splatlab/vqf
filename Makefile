@@ -18,8 +18,8 @@ ifdef P
 	PROFILE=-pg -no-pie # for bug in gprof.
 endif
 
-CXX = g++ -std=c++11 -mavx512f -frename-registers -march=native
-CC = gcc -std=gnu11 -mavx512f -frename-registers -march=native
+CXX = g++ -std=c++11 -mavx512bw -mavx512f -frename-registers -march=native
+CC = gcc -std=gnu11  -mavx512bw -mavx512f -frename-registers -march=native
 LD= g++ -std=c++11
 
 LOC_INCLUDE=include

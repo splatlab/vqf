@@ -268,19 +268,29 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
-	uint64_t tag = hash & 0xff;
-	uint64_t block_index = hash >> filter->metadata.key_remainder_bits;
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) %
-															filter->metadata.range) >>
-		filter->metadata.key_remainder_bits;
+	ququ_metadata * restrict metadata           = &filter->metadata;
+	ququ_block    * restrict blocks             = filter->blocks;
+	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
+	uint64_t                 range              = metadata->range;
 
-	bool ret = check_tags(filter, tag, block_index) ? true : check_tags(filter, tag,
-																																	alt_block_index);
+	uint64_t block_index = hash >> key_remainder_bits;
+	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	uint64_t tag = hash & 0xff;
+	uint64_t block_free     =	get_block_free_space(block_md);
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+
+	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
+        
+	if (block_free < QUQU_CHECK_ALT) {
+	    return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag, alt_block_index);
+        } else {
+           return check_tags(filter, tag, block_index); 
+       }
+
 	/*if (!ret) {*/
 		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
 		/*print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);*/
 		/*print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);*/
 	/*}*/
-	return ret;
 }
 
