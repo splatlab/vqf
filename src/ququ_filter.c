@@ -69,6 +69,27 @@ static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
 	}
 }
 
+static inline int64_t word_bsf(uint64_t val)
+{
+   asm("bsfq %[val], %[val]"
+         : [val] "+r" (val)
+         :
+         : "cc");
+   return val;
+}
+
+static inline int bsf_128(__uint128_t u, int index) {
+   static const __uint128_t one = 1;
+   __uint128_t unshifted_mask = (one << index) - 1;
+   u = u & ~unshifted_mask;
+   uint64_t hi = u >> 64;
+   uint64_t lo = u;
+   int lo_eq_0 = (lo == 0); 
+   uint64_t hi_or_lo = lo_eq_0 ? hi : lo;
+   int bsf_hi_or_lo = word_bsf(hi_or_lo);
+   return bsf_hi_or_lo + (lo_eq_0 << 6);
+}
+
 //assumes little endian
 void print_bits(__uint128_t num, int numbits)
 {
@@ -242,7 +263,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 #endif
 	blocks[index].md = update_md(block_md, select_index);
         
-	/*print_block(filter, index);*/
+	//print_block(filter, index);
 	return 0;
 }
 
@@ -250,29 +271,35 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+	__m512i bcast = _mm512_set1_epi8(tag);
+	__m512i block = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+	__mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+
+	if (result == 0) {
+		// no matching tags, can bail
+		return false;
+	}
+
 	uint64_t start, end;
+        uint64_t select1;
 	if (offset == 0) {
 		start = 0;
+                select1 = 0;
 	} else {
-		start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
+		select1 = select_128(filter->blocks[index].md, offset - 1);
+		start = select1 - offset + 1;
 	}
-	end = select_128(filter->blocks[index].md, offset) - offset;
-#if 1
-  if (start == end)
-    return 0;
-  
-  __m512i   bcast  = _mm512_set1_epi8(tag);
-  __m512i   block  = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-  uint64_t  mask   = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
-  __mmask64 result = _mm512_mask_cmp_epi8_mask(mask, bcast, block, _MM_CMPINT_EQ);
-  return result != 0;
-#else
-	for (uint64_t i = start; i < end; i++) {
-		if (tag == filter->blocks[index].tags[i])
-			return true;
-	}
-        return false;
-#endif
+//        uint64_t select2_new = bsf_128(filter->blocks[index].md, select1+1);
+	uint64_t select2 = select_128(filter->blocks[index].md, offset);
+//        if (select2 != select2_new) {
+//           printf("Old End: %ld New End: %ld Index: %ld\n", select2, select2_new, select1+1);
+//	    print_block(filter, index);
+//            exit(1);
+//        }
+        end = select2 - offset;
+	uint64_t mask = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
+	//printf("0x%lx 0x%lx\n", result, mask);
+	return (mask & result) != 0;
 }
 
 // If the item goes in the i'th slot (starting from 0) in the block then
