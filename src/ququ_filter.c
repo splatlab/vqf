@@ -39,11 +39,21 @@ static inline int word_rank(uint64_t val) {
 	/*return val;*/
 }
 
+static uint64_t pre_one[64 + 128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+   1ULL << 0, 1ULL << 1, 1ULL << 2, 1ULL << 3, 1ULL << 4, 1ULL << 5, 1ULL << 6, 1ULL << 7, 1ULL << 8, 1ULL << 9,
+   1ULL << 10, 1ULL << 11, 1ULL << 12, 1ULL << 13, 1ULL << 14, 1ULL << 15, 1ULL << 16, 1ULL << 17, 1ULL << 18, 1ULL << 19, 
+   1ULL << 20, 1ULL << 21, 1ULL << 22, 1ULL << 23, 1ULL << 24, 1ULL << 25, 1ULL << 26, 1ULL << 27, 1ULL << 28, 1ULL << 29, 
+   1ULL << 30, 1ULL << 31, 1ULL << 32, 1ULL << 33, 1ULL << 34, 1ULL << 35, 1ULL << 36, 1ULL << 37, 1ULL << 38, 1ULL << 39, 
+   1ULL << 40, 1ULL << 41, 1ULL << 42, 1ULL << 43, 1ULL << 44, 1ULL << 45, 1ULL << 46, 1ULL << 47, 1ULL << 48, 1ULL << 49, 
+   1ULL << 50, 1ULL << 51, 1ULL << 52, 1ULL << 53, 1ULL << 54, 1ULL << 55, 1ULL << 56, 1ULL << 57, 1ULL << 58, 1ULL << 59, 
+   1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+static uint64_t *one = pre_one + 64;
+
 // Returns the position of the rank'th 1.  (rank = 0 returns the 1st 1)
 // Returns 64 if there are fewer than rank+1 1s.
 static inline uint64_t word_select(uint64_t val, int rank) {
-	uint64_t i = 1ULL << rank;
-	val = _pdep_u64(i, val);
+	val = _pdep_u64(one[rank], val);
 	return _tzcnt_u64(val);
 	/*asm("pdep %[val], %[mask], %[val]"*/
 			/*: [val] "+r" (val)*/
@@ -57,46 +67,45 @@ static inline uint64_t word_select(uint64_t val, int rank) {
 
 // select(vec, 0) -> -1
 // select(vec, i) -> 128, if i > popcnt(vec)
-static inline int64_t select_128(__uint128_t vector, uint64_t rank) {
+static inline int64_t select_128_old(__uint128_t vector, uint64_t rank) {
 	uint64_t lower_word = vector & 0xffffffffffffffff;
-	uint64_t lower_rank = word_rank(lower_word);
-	if (lower_rank > rank) {
-		return word_select(lower_word, rank);
-	} else {
-		rank = rank - lower_rank;
-		uint64_t higher_word = vector >> 64;
-                return word_select(higher_word, rank) + 64;
+        uint64_t lower_pdep = _pdep_u64(one[rank], lower_word);
+        //uint64_t lower_select = word_select(lower_word, rank);
+        if (lower_pdep != 0) {
+           //assert(rank < word_rank(lower_word));
+           return _tzcnt_u64(lower_pdep);
 	}
+	rank = rank - word_rank(lower_word);
+	uint64_t higher_word = vector >> 64;
+        return word_select(higher_word, rank) + 64;
 }
 
-static inline int64_t word_bsf(uint64_t val)
-{
-   asm("bsfq %[val], %[val]"
-         : [val] "+r" (val)
-         :
-         : "cc");
-   return val;
+static inline uint64_t lookup_128(uint64_t *vector, uint64_t rank) {
+	uint64_t lower_word = vector[0];
+	uint64_t lower_rank = word_rank(lower_word);
+        uint64_t lower_return = _pdep_u64(one[rank], lower_word) >> rank << sizeof(__uint128_t);
+        int64_t higher_rank = (int64_t)rank - lower_rank;
+	uint64_t higher_word = vector[1];
+        uint64_t higher_return = _pdep_u64(one[higher_rank], higher_word);
+        higher_return <<= (64 + sizeof(__uint128_t) - rank);
+        return lower_return + higher_return;
 }
 
-static inline int bsf_128(__uint128_t u, int index) {
-   static const __uint128_t one = 1;
-   __uint128_t unshifted_mask = (one << index) - 1;
-   u = u & ~unshifted_mask;
-   uint64_t hi = u >> 64;
-   uint64_t lo = u;
-   int lo_eq_0 = (lo == 0); 
-   uint64_t hi_or_lo = lo_eq_0 ? hi : lo;
-   int bsf_hi_or_lo = word_bsf(hi_or_lo);
-   return bsf_hi_or_lo + (lo_eq_0 << 6);
+static inline int64_t select_128(uint64_t *vector, uint64_t rank) {
+        return _tzcnt_u64(lookup_128(vector, rank));
 }
 
 //assumes little endian
 void print_bits(__uint128_t num, int numbits)
 {
   int i;
-  for (i = 0 ; i < numbits; i++)
+  for (i = 0 ; i < numbits; i++) {
+    if (i != 0 && i % 8 == 0) {
+       printf(":");
+    }
     printf("%d", ((num >> i) & 1) == 1);
-	puts("");
+  }
+  puts("");
 }
 
 void print_tags(uint8_t *tags, uint32_t size) {
@@ -124,7 +133,6 @@ static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8
 
 static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 																	 uint8_t tag) {
-	index = index + sizeof(__uint128_t);	// offset index based on md field.
 	block->tags[47] = tag;	// add tag at the end
 
         __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
@@ -233,7 +241,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-//	if (block_free < QUQU_CHECK_ALT) {
+	if (block_free < QUQU_CHECK_ALT) {
 		__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
 		uint64_t alt_block_free =	get_block_free_space(alt_block_md);
 		// pick the least loaded block
@@ -244,14 +252,13 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 			fprintf(stderr, "ququ filter is full.");
 			exit(EXIT_FAILURE);
 		}
-//	}
+	}
 
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
-	uint64_t select_index = select_128(block_md, offset);
-	uint64_t slot_index = select_index - offset;
-
+	uint64_t slot_index = select_128((uint64_t *)&block_md, offset);
+        uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
 	/*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
 	/*print_block(filter, index);*/
 
@@ -263,7 +270,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 #endif
 	blocks[index].md = update_md(block_md, select_index);
         
-	//print_block(filter, index);
+	/*print_block(filter, index);*/
 	return 0;
 }
 
@@ -273,22 +280,16 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 
 	__m512i bcast = _mm512_set1_epi8(tag);
 	__m512i block = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-	__mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
 		// no matching tags, can bail
 		return false;
 	}
 
-	uint64_t start, end;
-	if (offset == 0) {
-		start = 0;
-	} else {
-		start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
-	}
-	end = select_128(filter->blocks[index].md, offset) - offset;
-	uint64_t mask = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
-	//printf("0x%lx 0x%lx\n", result, mask);
+        uint64_t start = offset != 0 ? lookup_128((uint64_t *)&filter->blocks[index].md, offset - 1) : one[0] << sizeof(__uint128_t);
+        uint64_t end = lookup_128((uint64_t *)&filter->blocks[index].md, offset);
+        uint64_t mask = end - start;
 	return (mask & result) != 0;
 }
 
@@ -308,11 +309,11 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
         
-//	if (block_free < QUQU_CHECK_ALT) {
+	if (block_free < QUQU_CHECK_ALT) {
 	    return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag, alt_block_index);
-//        } else {
-//           return check_tags(filter, tag, block_index); 
-//       }
+        } else {
+           return check_tags(filter, tag, block_index); 
+       }
 
 	/*if (!ret) {*/
 		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
