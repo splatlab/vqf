@@ -281,22 +281,12 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 	}
 
 	uint64_t start, end;
-        uint64_t select1;
 	if (offset == 0) {
 		start = 0;
-                select1 = 0;
 	} else {
-		select1 = select_128(filter->blocks[index].md, offset - 1);
-		start = select1 - offset + 1;
+		start = select_128(filter->blocks[index].md, offset - 1) - offset + 1;
 	}
-//        uint64_t select2_new = bsf_128(filter->blocks[index].md, select1+1);
-	uint64_t select2 = select_128(filter->blocks[index].md, offset);
-//        if (select2 != select2_new) {
-//           printf("Old End: %ld New End: %ld Index: %ld\n", select2, select2_new, select1+1);
-//	    print_block(filter, index);
-//            exit(1);
-//        }
-        end = select2 - offset;
+	end = select_128(filter->blocks[index].md, offset) - offset;
 	uint64_t mask = ((1ULL << end) - (1ULL << start)) << sizeof(__uint128_t);
 	//printf("0x%lx 0x%lx\n", result, mask);
 	return (mask & result) != 0;
