@@ -233,7 +233,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-	if (block_free < QUQU_CHECK_ALT) {
+//	if (block_free < QUQU_CHECK_ALT) {
 		__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
 		uint64_t alt_block_free =	get_block_free_space(alt_block_md);
 		// pick the least loaded block
@@ -244,7 +244,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 			fprintf(stderr, "ququ filter is full.");
 			exit(EXIT_FAILURE);
 		}
-	}
+//	}
 
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
@@ -308,11 +308,11 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
         
-	if (block_free < QUQU_CHECK_ALT) {
+//	if (block_free < QUQU_CHECK_ALT) {
 	    return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag, alt_block_index);
-        } else {
-           return check_tags(filter, tag, block_index); 
-       }
+//        } else {
+//           return check_tags(filter, tag, block_index); 
+//       }
 
 	/*if (!ret) {*/
 		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
