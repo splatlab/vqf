@@ -117,8 +117,8 @@ void print_tags(uint8_t *tags, uint32_t size) {
 void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
-	__uint128_t md = filter->blocks[block_index].md;
-	print_bits(md, QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK);
+	uint64_t *md = filter->blocks[block_index].md;
+	print_bits(*(__uint128_t *)md, QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK);
 	printf("tags: ");
 	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
@@ -177,19 +177,85 @@ static inline void update_tags(uint8_t * restrict block, uint8_t index, uint8_t 
 }
 #endif
 
-static inline __uint128_t update_md(__uint128_t md, uint8_t index) {
-  static const __uint128_t one = 1;
-  
-  __uint128_t unshifted_mask = (one << index) - 1;
-  __uint128_t unshifted_md = md & unshifted_mask;
-  __uint128_t shifted_md = (md & ~unshifted_mask) << 1;
-  return shifted_md | unshifted_md;
+const static uint64_t carry_pdep_table[128] {
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
+   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL
+};
+
+const static uint64_t high_order_pdep_table[128] {
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
+   ~(1ULL << 0), ~(1ULL << 1), ~(1ULL << 2), ~(1ULL << 3), ~(1ULL << 4), ~(1ULL << 5), ~(1ULL << 6), ~(1ULL << 7),
+   ~(1ULL << 8), ~(1ULL << 9), ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15),
+   ~(1ULL << 16), ~(1ULL << 17), ~(1ULL << 18), ~(1ULL << 19), ~(1ULL << 20), ~(1ULL << 21), ~(1ULL << 22), ~(1ULL << 23),
+   ~(1ULL << 24), ~(1ULL << 25), ~(1ULL << 26), ~(1ULL << 27), ~(1ULL << 28), ~(1ULL << 29), ~(1ULL << 30), ~(1ULL << 31),
+   ~(1ULL << 32), ~(1ULL << 33), ~(1ULL << 34), ~(1ULL << 35), ~(1ULL << 36), ~(1ULL << 37), ~(1ULL << 38), ~(1ULL << 39),
+   ~(1ULL << 40), ~(1ULL << 41), ~(1ULL << 42), ~(1ULL << 43), ~(1ULL << 44), ~(1ULL << 45), ~(1ULL << 46), ~(1ULL << 47),
+   ~(1ULL << 48), ~(1ULL << 49), ~(1ULL << 50), ~(1ULL << 51), ~(1ULL << 52), ~(1ULL << 53), ~(1ULL << 54), ~(1ULL << 55),
+   ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63)
+};
+
+const static uint64_t low_order_pdep_table[128] {
+   ~(1ULL << 0), ~(1ULL << 1), ~(1ULL << 2), ~(1ULL << 3), ~(1ULL << 4), ~(1ULL << 5), ~(1ULL << 6), ~(1ULL << 7),
+   ~(1ULL << 8), ~(1ULL << 9), ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15),
+   ~(1ULL << 16), ~(1ULL << 17), ~(1ULL << 18), ~(1ULL << 19), ~(1ULL << 20), ~(1ULL << 21), ~(1ULL << 22), ~(1ULL << 23),
+   ~(1ULL << 24), ~(1ULL << 25), ~(1ULL << 26), ~(1ULL << 27), ~(1ULL << 28), ~(1ULL << 29), ~(1ULL << 30), ~(1ULL << 31),
+   ~(1ULL << 32), ~(1ULL << 33), ~(1ULL << 34), ~(1ULL << 35), ~(1ULL << 36), ~(1ULL << 37), ~(1ULL << 38), ~(1ULL << 39),
+   ~(1ULL << 40), ~(1ULL << 41), ~(1ULL << 42), ~(1ULL << 43), ~(1ULL << 44), ~(1ULL << 45), ~(1ULL << 46), ~(1ULL << 47),
+   ~(1ULL << 48), ~(1ULL << 49), ~(1ULL << 50), ~(1ULL << 51), ~(1ULL << 52), ~(1ULL << 53), ~(1ULL << 54), ~(1ULL << 55),
+   ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63),
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
+   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL
+};
+
+
+static inline void update_md(uint64_t *md, uint8_t index) {
+  uint64_t carry = (md[0] >> 63) & carry_pdep_table[index];
+  md[1] = _pdep_u64(md[1],         high_order_pdep_table[index]) | carry;
+  md[0] = _pdep_u64(md[0],         low_order_pdep_table[index]);
 }
+//static inline void update_md(uint64_t *md, uint8_t index) {
+//  if (index < 64) {
+//    md[1] = (md[1] << 1) | md[0] >> 63;
+//    uint64_t mask = ~(1ULL << index);
+//    md[0] = _pdep_u64(md[0], mask);
+//  } else {
+//    uint64_t mask = ~(1ULL << (index - 64));
+//    md[1] = _pdep_u64(md[1], mask);
+//  }
+//
+//}
 
 // number of 0s in the metadata is the number of tags.
-static inline uint64_t get_block_free_space(__uint128_t vector) {
-	uint64_t lower_word = vector & 0xffffffffffffffff;
-	uint64_t higher_word = vector >> 64;
+static inline uint64_t get_block_free_space(uint64_t *vector) {
+	uint64_t lower_word = vector[0];
+	uint64_t higher_word = vector[1];
 	return word_rank(lower_word) + word_rank(higher_word);
 }
 
@@ -215,9 +281,8 @@ ququ_filter * ququ_init(uint64_t nslots) {
 
 	// memset to 1
 	for (uint64_t i = 0; i < total_blocks; i++) {
-		__uint128_t set_vector = UINT64_MAX;
-		set_vector = set_vector << 64 | UINT64_MAX;
-		filter->blocks[i].md = set_vector;
+		filter->blocks[i].md[0] = UINT64_MAX;
+		filter->blocks[i].md[1] = UINT64_MAX;
 	}
 
 	return filter;
@@ -234,16 +299,16 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t                 range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
-	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
-	uint64_t block_free     =	get_block_free_space(block_md);
+	uint64_t block_free = get_block_free_space(block_md);
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
 	if (block_free < QUQU_CHECK_ALT) {
-		__uint128_t alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
-		uint64_t alt_block_free =	get_block_free_space(alt_block_md);
+		uint64_t *alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+		uint64_t alt_block_free = get_block_free_space(alt_block_md);
 		// pick the least loaded block
 		if (alt_block_free > block_free) {
 			block_index = alt_block_index;
@@ -257,7 +322,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
-	uint64_t slot_index = select_128((uint64_t *)&block_md, offset);
+	uint64_t slot_index = select_128(block_md, offset);
         uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
 	/*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
 	/*print_block(filter, index);*/
@@ -268,7 +333,7 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	//update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
 	update_tags_512(&blocks[index], slot_index,tag);
 #endif
-	blocks[index].md = update_md(block_md, select_index);
+	update_md(block_md, select_index);
         
 	/*print_block(filter, index);*/
 	return 0;
@@ -287,8 +352,8 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 		return false;
 	}
 
-        uint64_t start = offset != 0 ? lookup_128((uint64_t *)&filter->blocks[index].md, offset - 1) : one[0] << sizeof(__uint128_t);
-        uint64_t end = lookup_128((uint64_t *)&filter->blocks[index].md, offset);
+        uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset - 1) : one[0] << 2 * sizeof(uint64_t);
+        uint64_t end = lookup_128(filter->blocks[index].md, offset);
         uint64_t mask = end - start;
 	return (mask & result) != 0;
 }
@@ -297,23 +362,23 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
-	ququ_block    * restrict blocks             = filter->blocks;
+	//ququ_block    * restrict blocks             = filter->blocks;
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	uint64_t                 range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
-	__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	//__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
-	uint64_t block_free     =	get_block_free_space(block_md);
+	//uint64_t block_free     =	get_block_free_space(block_md);
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
         
-//	if (block_free < QUQU_CHECK_ALT) {
-	    return check_tags(filter, tag, block_index) ? true : check_tags(filter, tag, alt_block_index);
-//        } else {
-//           return check_tags(filter, tag, block_index); 
-//       }
+	//if (block_free < QUQU_CHECK_ALT) {
+	    return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
+       // } else {
+       //    return check_tags(filter, tag, block_index); 
+       //}
 
 	/*if (!ret) {*/
 		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
