@@ -84,7 +84,12 @@ int main(int argc, char **argv)
 //	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
+#if VALUE_BITS == 0
 		if (!ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (!ququ_is_present(filter, vals[i], &value)) {
+#endif
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}
@@ -95,7 +100,12 @@ int main(int argc, char **argv)
   uint64_t nfps = 0;
 	/* Lookup hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_is_present(filter, other_vals[i])) {
+#if VALUE_BITS == 0
+		if (ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (ququ_is_present(filter, vals[i], &value)) {
+#endif
       nfps++;
 		}
 	}

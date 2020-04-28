@@ -446,12 +446,62 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
 	// } else {
 	//    return check_tags(filter, tag, block_index); 
 	//}
+}
 
-	/*if (!ret) {*/
-	/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
-	/*print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);*/
-	/*print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);*/
-	/*}*/
+static inline bool set_tags(ququ_filter * restrict filter, uint8_t tag,
+															uint64_t block_index, uint8_t value) {
+	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
+
+	__m512i bcast = _mm512_set1_epi8(tag);
+	__m512i block =
+		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+
+	if (result == 0) {
+		// no matching tags, can bail
+		return false;
+	}
+
+	uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
+																						1) : one[0] << 2 *
+		sizeof(uint64_t);
+	uint64_t end = lookup_128(filter->blocks[index].md, offset);
+	uint64_t mask = end - start;
+	uint64_t check_indexes = mask & result;
+
+        if (check_indexes != 0) { // set any one of the tags
+           tag = tag & value;
+           uint8_t bit_index = __builtin_ctzll(check_indexes);
+           filter->blocks[index].tags[bit_index + sizeof(__uint128_t)] = tag;
+           return true;
+	} else
+		return false;
+}
+
+bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value) {
+	ququ_metadata * restrict metadata           = &filter->metadata;
+	//ququ_block    * restrict blocks             = filter->blocks;
+	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
+	uint64_t                 range              = metadata->range;
+
+	uint64_t block_index = hash >> key_remainder_bits;
+	//__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	uint64_t tag = hash & 0xff;
+	//uint64_t block_free     =	get_block_free_space(block_md);
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+
+	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
+
+	//if (block_free < QUQU_CHECK_ALT) {
+	return set_tags(filter, tag, block_index, value) || set_tags(filter,
+																																	 tag,
+																																	 alt_block_index,
+																																	 value);
+	// } else {
+	//    return check_tags(filter, tag, block_index); 
+	//}
+
 }
 
 #endif
