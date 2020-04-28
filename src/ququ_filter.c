@@ -22,47 +22,19 @@
 #include "shuffle_matrix_512.h"
 #include "ququ_filter.h"
 
-#define MAX_VALUE(nbits) ((1ULL << (nbits)) - 1)
-#define BITMASK(nbits)                                    \
-  ((nbits) == 64 ? 0xffffffffffffffff : MAX_VALUE(nbits))
-
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
 #define QUQU_CHECK_ALT 92
 
 static inline int word_rank(uint64_t val) {
 	return __builtin_popcountll(val);
-	/*asm("popcnt %[val], %[val]"*/
-			/*: [val] "+r" (val)*/
-			/*:*/
-			/*: "cc");*/
-	/*return val;*/
 }
-
-static uint64_t pre_one[64 + 128] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-   1ULL << 0, 1ULL << 1, 1ULL << 2, 1ULL << 3, 1ULL << 4, 1ULL << 5, 1ULL << 6, 1ULL << 7, 1ULL << 8, 1ULL << 9,
-   1ULL << 10, 1ULL << 11, 1ULL << 12, 1ULL << 13, 1ULL << 14, 1ULL << 15, 1ULL << 16, 1ULL << 17, 1ULL << 18, 1ULL << 19, 
-   1ULL << 20, 1ULL << 21, 1ULL << 22, 1ULL << 23, 1ULL << 24, 1ULL << 25, 1ULL << 26, 1ULL << 27, 1ULL << 28, 1ULL << 29, 
-   1ULL << 30, 1ULL << 31, 1ULL << 32, 1ULL << 33, 1ULL << 34, 1ULL << 35, 1ULL << 36, 1ULL << 37, 1ULL << 38, 1ULL << 39, 
-   1ULL << 40, 1ULL << 41, 1ULL << 42, 1ULL << 43, 1ULL << 44, 1ULL << 45, 1ULL << 46, 1ULL << 47, 1ULL << 48, 1ULL << 49, 
-   1ULL << 50, 1ULL << 51, 1ULL << 52, 1ULL << 53, 1ULL << 54, 1ULL << 55, 1ULL << 56, 1ULL << 57, 1ULL << 58, 1ULL << 59, 
-   1ULL << 60, 1ULL << 61, 1ULL << 62, 1ULL << 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-static uint64_t *one = pre_one + 64;
 
 // Returns the position of the rank'th 1.  (rank = 0 returns the 1st 1)
 // Returns 64 if there are fewer than rank+1 1s.
 static inline uint64_t word_select(uint64_t val, int rank) {
 	val = _pdep_u64(one[rank], val);
 	return _tzcnt_u64(val);
-	/*asm("pdep %[val], %[mask], %[val]"*/
-			/*: [val] "+r" (val)*/
-			/*: [mask] "r" (i));*/
-	/*asm("tzcnt %[bit], %[index]"*/
-			/*: [index] "=r" (i)*/
-			/*: [bit] "g" (val)*/
-			/*: "cc");*/
-	/*return i;*/
 }
 
 // select(vec, 0) -> -1
@@ -140,16 +112,6 @@ static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
-const __m256i K0 = _mm256_setr_epi8( 
-		0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 
-		0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0); 
-
-const __m256i K1 = _mm256_setr_epi8( 
-		0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 0xF0, 
-		0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70); 
-
-const __m256i K[] = {K0, K1};
-
 #define QUQU_CHECK_ALT 92
 inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle) 
 { 
@@ -166,7 +128,8 @@ void shuffle_256(uint8_t * restrict source, __m256i shuffle) {
   _mm256_storeu_si256(reinterpret_cast<__m256i*>(source), vector); 
 } 
 
-static inline void update_tags(uint8_t * restrict block, uint8_t index, uint8_t tag) {
+static inline void update_tags_256(uint8_t * restrict block, uint8_t index,
+																	 uint8_t tag) {
 	index = index + sizeof(__uint128_t);	// offset index based on md field.
 	block[63] = tag;	// add tag at the end
 	shuffle_256(block + SHUFFLE_SIZE, RM[index]); // right block shuffle
@@ -177,80 +140,11 @@ static inline void update_tags(uint8_t * restrict block, uint8_t index, uint8_t 
 }
 #endif
 
-const static uint64_t carry_pdep_table[128] {
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL, 1ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL,
-   0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL, 0ULL
-};
-
-const static uint64_t high_order_pdep_table[128] {
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0), ~(1ULL << 0),
-   ~(1ULL << 0), ~(1ULL << 1), ~(1ULL << 2), ~(1ULL << 3), ~(1ULL << 4), ~(1ULL << 5), ~(1ULL << 6), ~(1ULL << 7),
-   ~(1ULL << 8), ~(1ULL << 9), ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15),
-   ~(1ULL << 16), ~(1ULL << 17), ~(1ULL << 18), ~(1ULL << 19), ~(1ULL << 20), ~(1ULL << 21), ~(1ULL << 22), ~(1ULL << 23),
-   ~(1ULL << 24), ~(1ULL << 25), ~(1ULL << 26), ~(1ULL << 27), ~(1ULL << 28), ~(1ULL << 29), ~(1ULL << 30), ~(1ULL << 31),
-   ~(1ULL << 32), ~(1ULL << 33), ~(1ULL << 34), ~(1ULL << 35), ~(1ULL << 36), ~(1ULL << 37), ~(1ULL << 38), ~(1ULL << 39),
-   ~(1ULL << 40), ~(1ULL << 41), ~(1ULL << 42), ~(1ULL << 43), ~(1ULL << 44), ~(1ULL << 45), ~(1ULL << 46), ~(1ULL << 47),
-   ~(1ULL << 48), ~(1ULL << 49), ~(1ULL << 50), ~(1ULL << 51), ~(1ULL << 52), ~(1ULL << 53), ~(1ULL << 54), ~(1ULL << 55),
-   ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63)
-};
-
-const static uint64_t low_order_pdep_table[128] {
-   ~(1ULL << 0), ~(1ULL << 1), ~(1ULL << 2), ~(1ULL << 3), ~(1ULL << 4), ~(1ULL << 5), ~(1ULL << 6), ~(1ULL << 7),
-   ~(1ULL << 8), ~(1ULL << 9), ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15),
-   ~(1ULL << 16), ~(1ULL << 17), ~(1ULL << 18), ~(1ULL << 19), ~(1ULL << 20), ~(1ULL << 21), ~(1ULL << 22), ~(1ULL << 23),
-   ~(1ULL << 24), ~(1ULL << 25), ~(1ULL << 26), ~(1ULL << 27), ~(1ULL << 28), ~(1ULL << 29), ~(1ULL << 30), ~(1ULL << 31),
-   ~(1ULL << 32), ~(1ULL << 33), ~(1ULL << 34), ~(1ULL << 35), ~(1ULL << 36), ~(1ULL << 37), ~(1ULL << 38), ~(1ULL << 39),
-   ~(1ULL << 40), ~(1ULL << 41), ~(1ULL << 42), ~(1ULL << 43), ~(1ULL << 44), ~(1ULL << 45), ~(1ULL << 46), ~(1ULL << 47),
-   ~(1ULL << 48), ~(1ULL << 49), ~(1ULL << 50), ~(1ULL << 51), ~(1ULL << 52), ~(1ULL << 53), ~(1ULL << 54), ~(1ULL << 55),
-   ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63),
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL,
-   ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL, ~0ULL
-};
-
-
 static inline void update_md(uint64_t *md, uint8_t index) {
   uint64_t carry = (md[0] >> 63) & carry_pdep_table[index];
   md[1] = _pdep_u64(md[1],         high_order_pdep_table[index]) | carry;
   md[0] = _pdep_u64(md[0],         low_order_pdep_table[index]);
 }
-//static inline void update_md(uint64_t *md, uint8_t index) {
-//  if (index < 64) {
-//    md[1] = (md[1] << 1) | md[0] >> 63;
-//    uint64_t mask = ~(1ULL << index);
-//    md[0] = _pdep_u64(md[0], mask);
-//  } else {
-//    uint64_t mask = ~(1ULL << (index - 64));
-//    md[1] = _pdep_u64(md[1], mask);
-//  }
-//
-//}
 
 // number of 0s in the metadata is the number of tags.
 static inline uint64_t get_block_free_space(uint64_t *vector) {
@@ -330,7 +224,6 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 #if 0
 	update_tags(&blocks[index], slot_index,	tag);
 #else
-	//update_tags(reinterpret_cast<uint8_t*>(&blocks[index]), slot_index,tag);
 	update_tags_512(&blocks[index], slot_index,tag);
 #endif
 	update_md(block_md, select_index);
@@ -339,12 +232,14 @@ int ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	return 0;
 }
 
-static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64_t block_index) {
+static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
+															uint64_t block_index) {
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 	__m512i bcast = _mm512_set1_epi8(tag);
-	__m512i block = _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+	__m512i block =
+		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
 	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
@@ -352,9 +247,11 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag, uint64
 		return false;
 	}
 
-        uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset - 1) : one[0] << 2 * sizeof(uint64_t);
-        uint64_t end = lookup_128(filter->blocks[index].md, offset);
-        uint64_t mask = end - start;
+	uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
+																						1) : one[0] << 2 *
+		sizeof(uint64_t);
+	uint64_t end = lookup_128(filter->blocks[index].md, offset);
+	uint64_t mask = end - start;
 	return (mask & result) != 0;
 }
 
@@ -373,17 +270,17 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
-        
+
 	//if (block_free < QUQU_CHECK_ALT) {
-	    return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
-       // } else {
-       //    return check_tags(filter, tag, block_index); 
-       //}
+	return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
+	// } else {
+	//    return check_tags(filter, tag, block_index); 
+	//}
 
 	/*if (!ret) {*/
-		/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
-		/*print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);*/
-		/*print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);*/
+	/*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
+	/*print_block(filter, block_index / QUQU_SLOTS_PER_BLOCK);*/
+	/*print_block(filter, alt_block_index / QUQU_SLOTS_PER_BLOCK);*/
 	/*}*/
 }
 
