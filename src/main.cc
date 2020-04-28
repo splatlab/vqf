@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(filter, vals[i]) < 0) {
+		if (!ququ_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(filter, vals[i]) < 0) {
+		if (!ququ_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}

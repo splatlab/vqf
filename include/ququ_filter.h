@@ -20,6 +20,8 @@
 extern "C" {
 #endif
 
+#define VALUE_BITS 0
+
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
 	// run.
@@ -47,9 +49,16 @@ extern "C" {
 
 	ququ_filter * ququ_init(uint64_t nslots);
 
-	int ququ_insert(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_insert(ququ_filter * restrict filter, uint64_t hash);
 
+#if VALUE_BITS == 0
 	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash);
+#else
+	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
+											 *value);
+
+	bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value);
+#endif
 
 #ifdef __cplusplus
 }

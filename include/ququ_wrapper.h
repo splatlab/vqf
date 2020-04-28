@@ -26,7 +26,7 @@ inline int q_init(uint64_t nbits)
 
 inline int q_insert(__uint128_t val)
 {
-	if (ququ_insert(q_filter, val) < 0)
+	if (!ququ_insert(q_filter, val))
 		return 0;
 	return 1;
 }
