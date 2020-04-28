@@ -358,17 +358,42 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 
 #else
 
+#define VALUE00 0x0
+#define VALUE01 0x1
+#define VALUE10 0x2
+#define VALUE11 0x3
+
 static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 															uint64_t block_index, uint8_t *value) {
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
-	__m512i bcast = _mm512_set1_epi8(tag);
+
+// The broadcast tag should take care of all different possible values.
+// We bitwise OR the results of all possible cmp instructions.
 	__m512i block =
 		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-	// TODO: the compare will not work. Need to only compare against
-	// 8 - VALUE_BITS in each byte.
+#if VALUE_BITS == 1
+        uint8_t tag_val = tag | VALUE00;
+	__m512i bcast = _mm512_set1_epi8(tag_val);
 	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+        tag_val = tag | VALUE01;
+	bcast = _mm512_set1_epi8(tag_val);
+	result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#elif VALUE_BITS == 2
+        uint8_t tag_val0 = tag | VALUE00;
+	__m512i bcast = _mm512_set1_epi8(tag_val);
+	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+        tag_val = tag | VALUE01;
+	bcast = _mm512_set1_epi8(tag_val);
+	result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+        tag_val = tag | VALUE10;
+	bcast = _mm512_set1_epi8(tag_val);
+	result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+        tag_val = tag | VALUE11;
+	bcast = _mm512_set1_epi8(tag_val);
+	result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 
 	if (result == 0) {
 		// no matching tags, can bail
@@ -382,14 +407,14 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t mask = end - start;
 	uint64_t check_indexes = mask & result;
 
+// TODO: need to optimize this using AVX512 instructions        
 	if (check_indexes != 0) { // accumulate values
 		uint64_t value_mask = (1ULL << VALUE_BITS) - 1;
 		while (check_indexes) {
 			uint8_t bit_index = __builtin_ctzll(check_indexes);
 			*value = *value | filter->blocks[index].tags[bit_index +
 				sizeof(__uint128_t)] & value_mask;
-			*value = *value << VALUE_BITS;
-			check_indexes = check_indexes >> index; 
+			check_indexes = check_indexes >> bit_index; 
 		}
 		return true;
 	} else
