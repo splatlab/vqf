@@ -153,18 +153,10 @@ static inline void update_md(uint64_t *md, uint8_t index) {
   md[0] = _pdep_u64(md[0],         low_order_pdep_table[index]);
 }
 
-// TODO: this is really inefficient. Need to improve it using tricks from the
-// update_md function.
 static inline void remove_md(uint64_t *md, uint8_t index) {
-  static const __uint128_t one = 1;
-	__uint128_t metadata = md[1] << 64 | md[0];
-  
-  __uint128_t unshifted_mask = (one << (index - 1)) - 1;
-  __uint128_t unshifted_md = metadata & unshifted_mask;
-  __uint128_t shifted_md = (metadata & ~unshifted_mask) >> 1;
-	metadata = shifted_md | unshifted_md;
-	md[0] = metadata & ((one << 63) - 1);
-	md[1] = metadata >> 63;
+  uint64_t carry = (md[1] & carry_pdep_table[index]) << 63;
+  md[1] = _pext_u64(md[1],  high_order_pdep_table[index]);
+  md[0] = _pext_u64(md[0],  low_order_pdep_table[index]) | carry;
 }
 
 // number of 0s in the metadata is the number of tags.
