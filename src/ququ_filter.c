@@ -478,7 +478,7 @@ static inline bool set_tags(ququ_filter * restrict filter, uint8_t tag,
 	} else
 		return false;
 }
-
+/bin/bash: :binclude/ququ_filter.h: No such file or directory
 bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
 	//ququ_block    * restrict blocks             = filter->blocks;
