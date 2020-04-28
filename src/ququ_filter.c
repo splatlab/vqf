@@ -108,8 +108,14 @@ static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 																	 uint8_t tag) {
 	block->tags[47] = tag;	// add tag at the end
 
-        __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
+	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
 	vector = _mm512_permutexvar_epi8(SHUFFLE[index], vector);
+	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
+}
+
+static inline void remove_tags_512(ququ_block * restrict block, uint8_t index) {
+	__m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
+	vector = _mm512_permutexvar_epi8(SHUFFLE_REMOVE[index], vector);
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
@@ -145,6 +151,20 @@ static inline void update_md(uint64_t *md, uint8_t index) {
   uint64_t carry = (md[0] >> 63) & carry_pdep_table[index];
   md[1] = _pdep_u64(md[1],         high_order_pdep_table[index]) | carry;
   md[0] = _pdep_u64(md[0],         low_order_pdep_table[index]);
+}
+
+// TODO: this is really inefficient. Need to improve it using tricks from the
+// update_md function.
+static inline void remove_md(uint64_t *md, uint8_t index) {
+  static const __uint128_t one = 1;
+	__uint128_t metadata = md[1] << 64 | md[0];
+  
+  __uint128_t unshifted_mask = (one << index) - 1;
+  __uint128_t unshifted_md = metadata & unshifted_mask;
+  __uint128_t shifted_md = (md & ~unshifted_mask) >> 1;
+	metadata = shifted_md | unshifted_md;
+	md[0] = metadata & ((one << 63) - 1);
+	md[1] = metadata >> 63;
 }
 
 // number of 0s in the metadata is the number of tags.
@@ -234,6 +254,54 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	return 0;
 }
 
+static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
+															 uint64_t block_index) {
+	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
+	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
+
+	__m512i bcast = _mm512_set1_epi8(tag);
+	__m512i block =
+		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+
+	if (result == 0) {
+		// no matching tags, can bail
+		return false;
+	}
+
+	uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
+																						1) : one[0] << 2 *
+		sizeof(uint64_t);
+	uint64_t end = lookup_128(filter->blocks[index].md, offset);
+	uint64_t mask = end - start;
+	
+	uint64_t check_indexes = mask & result;
+	if (check_indexes != 0) { // remove the first available tag
+		ququ_block    * restrict blocks             = filter->blocks;
+		uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+		uint64_t remove_index = __builtin_ctzll(check_indexes);
+		remove_tags_512(&blocks[index], remove_index);
+		remove_md(block_md, end);
+		return true;
+	} else
+		return false;
+}
+
+bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
+	ququ_metadata * restrict metadata           = &filter->metadata;
+	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
+	uint64_t                 range              = metadata->range;
+
+	uint64_t block_index = hash >> key_remainder_bits;
+	uint64_t tag = hash & 0xff;
+	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+
+	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
+
+	return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
+
+}
+
 #if VALUE_BITS == 0
 
 static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
@@ -298,6 +366,8 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	__m512i bcast = _mm512_set1_epi8(tag);
 	__m512i block =
 		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+	// TODO: the compare will not work. Need to only compare against
+	// 8 - VALUE_BITS in each byte.
 	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
@@ -315,7 +385,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	if (check_indexes != 0) { // accumulate values
 		uint64_t value_mask = (1ULL << VALUE_BITS) - 1;
 		while (check_indexes) {
-			uint8_t bit_index = __builtin_ffsll(check_indexes);
+			uint8_t bit_index = __builtin_ctzll(check_indexes);
 			*value = *value | filter->blocks[index].tags[bit_index +
 				sizeof(__uint128_t)] & value_mask;
 			*value = *value << VALUE_BITS;

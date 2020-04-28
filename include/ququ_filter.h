@@ -50,6 +50,8 @@ extern "C" {
 	ququ_filter * ququ_init(uint64_t nslots);
 
 	bool ququ_insert(ququ_filter * restrict filter, uint64_t hash);
+	
+	bool ququ_remove(ququ_filter * restrict filter, uint64_t hash);
 
 #if VALUE_BITS == 0
 	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash);
