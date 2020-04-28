@@ -21,6 +21,7 @@
 #include "shuffle_matrix_256.h"
 #include "shuffle_matrix_512.h"
 #include "ququ_filter.h"
+#include "ququ_precompute.h"
 
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
