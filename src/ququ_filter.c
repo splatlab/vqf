@@ -159,9 +159,9 @@ static inline void remove_md(uint64_t *md, uint8_t index) {
   static const __uint128_t one = 1;
 	__uint128_t metadata = md[1] << 64 | md[0];
   
-  __uint128_t unshifted_mask = (one << index) - 1;
+  __uint128_t unshifted_mask = (one << (index - 1)) - 1;
   __uint128_t unshifted_md = metadata & unshifted_mask;
-  __uint128_t shifted_md = (md & ~unshifted_mask) >> 1;
+  __uint128_t shifted_md = (metadata & ~unshifted_mask) >> 1;
 	metadata = shifted_md | unshifted_md;
 	md[0] = metadata & ((one << 63) - 1);
 	md[1] = metadata >> 63;
@@ -298,7 +298,7 @@ bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-	return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
+	return remove_tags(filter, tag, block_index) || remove_tags(filter, tag, alt_block_index);
 
 }
 
