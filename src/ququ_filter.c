@@ -404,8 +404,8 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 		uint64_t value_mask = (1ULL << VALUE_BITS) - 1;
 		while (check_indexes) {
 			uint8_t bit_index = __builtin_ctzll(check_indexes);
-			*value = *value | filter->blocks[index].tags[bit_index +
-				sizeof(__uint128_t)] & value_mask;
+			*value = *value | (1 << filter->blocks[index].tags[bit_index +
+				sizeof(__uint128_t)] & value_mask);
 			check_indexes = check_indexes >> bit_index; 
 		}
 		return true;
