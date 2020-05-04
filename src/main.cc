@@ -18,6 +18,8 @@
 #include <openssl/rand.h>
 #include <sys/time.h>
 
+#include <set>
+
 #include "ququ_filter.h"
 #include "shuffle_matrix_512.h"
 
@@ -60,13 +62,20 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+	//RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
 	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
 	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
+		//vals[i] = (1 * vals[i]) % filter->metadata.range;
 		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
 	}
+
+        std::multiset<uint64_t> set;
+        srand(0);
+        for (uint32_t i = 0; i < nvals; i++) {
+           vals[i] = (rand() % filter->metadata.range);
+           set.insert(vals[i]);
+        }
 
 	struct timeval start, end;
 	struct timezone tzp;
@@ -78,6 +87,11 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
+               // ququ_remove(filter, vals[i]);
+              // if (ququ_is_present(filter, vals[i])) {
+              //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
+              //   exit(EXIT_FAILURE);
+              //}
 	}
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
@@ -101,10 +115,10 @@ int main(int argc, char **argv)
 	/* Lookup hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 #if VALUE_BITS == 0
-		if (ququ_is_present(filter, vals[i])) {
+		if (ququ_is_present(filter, other_vals[i])) {
 #else
                 uint8_t value;
-		if (ququ_is_present(filter, vals[i], &value)) {
+		if (ququ_is_present(filter, other_vals[i], &value)) {
 #endif
       nfps++;
 		}
@@ -116,7 +130,20 @@ int main(int argc, char **argv)
          nfps, nvals,
          1.0 * nvals / nfps);
 
+        fprintf(stdout, "Checking ququ_remove\n");
 
+	for (uint64_t i = 0; i < nvals; i++) {
+           if (rand()%10 == 0) {
+              uint64_t count = set.count(vals[i]);
+              if (count == 1) {
+                 ququ_remove(filter, vals[i]);
+                 if (ququ_is_present(filter, vals[i])) {
+                    fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
+                    exit(EXIT_FAILURE);
+                 }
+              }
+           }
+        }
 
 #if 0
 	//* Generate random values */

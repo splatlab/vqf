@@ -155,7 +155,7 @@ static inline void update_md(uint64_t *md, uint8_t index) {
 
 static inline void remove_md(uint64_t *md, uint8_t index) {
   uint64_t carry = (md[1] & carry_pdep_table[index]) << 63;
-  md[1] = _pext_u64(md[1],  high_order_pdep_table[index]);
+  md[1] = _pext_u64(md[1],  high_order_pdep_table[index]) | (1ULL << 63);
   md[0] = _pext_u64(md[0],  low_order_pdep_table[index]) | carry;
 }
 
@@ -243,7 +243,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	update_md(block_md, select_index);
         
 	/*print_block(filter, index);*/
-	return 0;
+	return true;
 }
 
 static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
@@ -273,7 +273,8 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
 		uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 		uint64_t remove_index = __builtin_ctzll(check_indexes);
 		remove_tags_512(&blocks[index], remove_index);
-		remove_md(block_md, end);
+                remove_index = remove_index + offset - sizeof(__uint128_t);
+		remove_md(block_md, remove_index);
 		return true;
 	} else
 		return false;
