@@ -210,7 +210,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
 	uint64_t block_free = get_block_free_space(block_md);
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
@@ -287,7 +287,7 @@ bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t tag = hash & 0xff;
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
@@ -332,7 +332,7 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
 	//__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
 	//uint64_t block_free     =	get_block_free_space(block_md);
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
@@ -427,7 +427,7 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
 	//__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
 	//uint64_t block_free     =	get_block_free_space(block_md);
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
@@ -482,7 +482,7 @@ bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value) {
 	//__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
 	//uint64_t block_free     =	get_block_free_space(block_md);
-	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+	uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
 	__builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 

@@ -38,6 +38,13 @@ inline int q_lookup(__uint128_t val)
 	return 1;
 }
 
+inline int q_delete(__uint128_t val)
+{
+	if (!ququ_remove(q_filter, val))
+		return 0;
+	return 1;
+}
+
 inline __uint128_t q_range()
 {
 	return q_filter->metadata.range;
