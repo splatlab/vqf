@@ -38,7 +38,7 @@ inline int q_lookup(__uint128_t val)
 	return 1;
 }
 
-inline int q_delete(__uint128_t val)
+inline int q_remove(__uint128_t val)
 {
 	if (!ququ_remove(q_filter, val))
 		return 0;

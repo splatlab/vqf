@@ -222,8 +222,8 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 			block_index = alt_block_index;
 			block_md = alt_block_md;
 		} else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
-			fprintf(stderr, "ququ filter is full.");
-			exit(EXIT_FAILURE);
+			// fprintf(stderr, "ququ filter is full.");
+		//	exit(EXIT_FAILURE);
 		}
 	}
 

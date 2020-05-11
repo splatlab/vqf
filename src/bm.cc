@@ -217,6 +217,7 @@ int main(int argc, char **argv) {
   rand_generator *vals_gen;
   void *vals_gen_state;
   void *old_vals_gen_state;
+  void *remove_vals_gen_state;
   rand_generator *othervals_gen;
   void *othervals_gen_state;
 
@@ -379,6 +380,7 @@ int main(int argc, char **argv) {
 
     vals_gen_state = vals_gen->init(nvals, filter_ds.range(), NULL);
     old_vals_gen_state = vals_gen->dup(vals_gen_state);
+    remove_vals_gen_state = vals_gen->dup(vals_gen_state);
     sleep(5);
     othervals_gen_state = othervals_gen->init(nvals, filter_ds.range(), NULL);
 
@@ -457,31 +459,31 @@ int main(int argc, char **argv) {
     }
 
     for (exp = 0; exp < 2 * npoints; exp += 2) {
-			fp_remove = fopen(filename_remove, "a");
-			i = (exp / 2) * (nvals / npoints);
-			j = ((exp / 2) + 1) * (nvals / npoints);
-			printf("Round: %d\n", exp / 2);
+       fp_remove = fopen(filename_remove, "a");
+       i = (exp / 2) * (nvals / npoints);
+       j = ((exp / 2) + 1) * (nvals / npoints);
+       printf("Round: %d\n", exp / 2);
 
-			gettimeofday(&tv_insert[exp][run], NULL);
-      for (; i < j; i += 1 << 16) {
-        int nitems = j - i < 1 << 16 ? j - i : 1 << 16;
-        __uint128_t vals[1 << 16];
-        int m;
-        assert(vals_gen->gen(vals_gen_state, nitems, vals) == nitems);
+       gettimeofday(&tv_remove[exp][run], NULL);
+       for (; i < j; i += 1 << 16) {
+          int nitems = j - i < 1 << 16 ? j - i : 1 << 16;
+          __uint128_t vals[1 << 16];
+          int m;
+          assert(vals_gen->gen(remove_vals_gen_state, nitems, vals) == nitems);
 
-        for (m = 0; m < nitems; m++) {
-          filter_ds.remove(vals[m]);
-        }
-      }
-      gettimeofday(&tv_remove[exp + 1][run], NULL);
-      fprintf(fp_remove, "%d", ((exp / 2) * (100 / npoints)));
-      fprintf(fp_remove, " %f\n",
-              0.001 * (nvals / npoints) /
-                  (tv2msec(tv_remove[exp + 1][run]) -
-                   tv2msec(tv_remove[exp][run])));
+          for (m = 0; m < nitems; m++) {
+             filter_ds.remove(vals[m]);
+          }
+       }
+       gettimeofday(&tv_remove[exp + 1][run], NULL);
+       fprintf(fp_remove, "%d", ((exp / 2) * (100 / npoints)));
+       fprintf(fp_remove, " %f\n",
+             0.001 * (nvals / npoints) /
+             (tv2msec(tv_remove[exp + 1][run]) -
+              tv2msec(tv_remove[exp][run])));
 
-			fclose(fp_remove);
-		}
+       fclose(fp_remove);
+   }
 
     filter_ds.destroy();
   }
