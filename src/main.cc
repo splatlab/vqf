@@ -62,20 +62,18 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	//RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
 	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
 	for (uint64_t i = 0; i < nvals; i++) {
-		//vals[i] = (1 * vals[i]) % filter->metadata.range;
+		vals[i] = (1 * vals[i]) % filter->metadata.range;
 		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
 	}
 
-        std::multiset<uint64_t> set;
-        srand(0);
-        for (uint32_t i = 0; i < nvals; i++) {
-           vals[i] = (rand() % filter->metadata.range);
-           set.insert(vals[i]);
-        }
+        //srand(0);
+        //for (uint32_t i = 0; i < nvals; i++) {
+        //   vals[i] = (rand() % filter->metadata.range);
+        //}
 
 	struct timeval start, end;
 	struct timezone tzp;
@@ -87,12 +85,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-               // ququ_remove(filter, vals[i]);
-              // if (ququ_is_present(filter, vals[i])) {
-              //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
-              //   exit(EXIT_FAILURE);
-              //}
-	}
+         }
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
@@ -130,20 +123,18 @@ int main(int argc, char **argv)
          nfps, nvals,
          1.0 * nvals / nfps);
 
-        fprintf(stdout, "Checking ququ_remove\n");
+        //fprintf(stdout, "Checking ququ_remove\n");
 
+	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
-           if (rand()%10 == 0) {
-              uint64_t count = set.count(vals[i]);
-              if (count == 1) {
-                 ququ_remove(filter, vals[i]);
-                 if (ququ_is_present(filter, vals[i])) {
-                    fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
-                    exit(EXIT_FAILURE);
-                 }
-              }
-           }
+           ququ_remove(filter, vals[i]);
+           //if (ququ_is_present(filter, vals[i])) {
+           //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
+           //   exit(EXIT_FAILURE);
+           //}
         }
+	gettimeofday(&end, &tzp);
+	print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
 	//* Generate random values */
