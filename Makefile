@@ -1,4 +1,4 @@
-TARGETS= main bm
+TARGETS= main main_tx bm
 
 ifdef D
 	DEBUG=-g
@@ -18,8 +18,8 @@ ifdef P
 	PROFILE=-pg -no-pie # for bug in gprof.
 endif
 
-CXX = g++ -std=c++11 -mavx512bw -mavx512f -frename-registers -march=native
-CC = gcc -std=gnu11  -mavx512bw -mavx512f -frename-registers -march=native
+CXX = g++ -std=c++11 -mavx512bw -mavx512f -frename-registers -mrtm -march=native
+CC = gcc -std=gnu11  -mavx512bw -mavx512f -frename-registers -mrtm -march=native
 LD= g++ -std=c++11
 
 LOC_INCLUDE=include
@@ -40,10 +40,12 @@ all: $(TARGETS)
 
 # dependencies between programs and .o files
 main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o
+main_tx:						$(OBJDIR)/main_tx.o $(OBJDIR)/ququ_filter.o
 bm:							$(OBJDIR)/bm.o $(OBJDIR)/ququ_filter.o
 
 # dependencies between .o files and .cc (or .c) files
 $(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
+$(OBJDIR)/main_tx.o: 			$(LOC_SRC)/main_tx.cc
 $(OBJDIR)/bm.o: 			$(LOC_SRC)/bm.cc
 
 $(OBJDIR)/ququ_filter.o: 			$(LOC_SRC)/ququ_filter.c

@@ -196,6 +196,13 @@ ququ_filter * ququ_init(uint64_t nslots) {
 	return filter;
 }
 
+bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
+   unsigned status = _XABORT_EXPLICIT;
+   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
+   ququ_insert(filter, hash);
+   _xend();
+}
+
 // If the item goes in the i'th slot (starting from 0) in the block then
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
 // by 1 bit.
@@ -280,6 +287,13 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
 		return false;
 }
 
+bool ququ_remove_tx(ququ_filter * restrict filter, uint64_t hash) {
+   unsigned status = _XABORT_EXPLICIT;
+   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
+   ququ_remove(filter, hash);
+   _xend();
+}
+
 bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
@@ -318,6 +332,13 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t end = lookup_128(filter->blocks[index].md, offset);
 	uint64_t mask = end - start;
 	return (mask & result) != 0;
+}
+
+bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash) {
+   unsigned status = _XABORT_EXPLICIT;
+   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
+   ququ_is_present(filter, hash);
+   _xend();
 }
 
 // If the item goes in the i'th slot (starting from 0) in the block then
@@ -414,6 +435,14 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 		return false;
 }
 
+bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t
+										 *value) {
+   unsigned status = _XABORT_EXPLICIT;
+   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
+   ququ_is_present_tx(filter, hash, value);
+   _xend();
+}
+
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
@@ -471,7 +500,14 @@ static inline bool set_tags(ququ_filter * restrict filter, uint8_t tag,
 	} else
 		return false;
 }
-/bin/bash: :binclude/ququ_filter.h: No such file or directory
+
+bool ququ_set_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t value) {
+   unsigned status = _XABORT_EXPLICIT;
+   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
+   ququ_set_tx(filter, hash, value);
+   _xend();
+}
+
 bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
 	//ququ_block    * restrict blocks             = filter->blocks;

@@ -50,16 +50,22 @@ extern "C" {
 	ququ_filter * ququ_init(uint64_t nslots);
 
 	bool ququ_insert(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash);
 	
 	bool ququ_remove(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_remove_tx(ququ_filter * restrict filter, uint64_t hash);
 
 #if VALUE_BITS == 0
 	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash);
 #else
 	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
 											 *value);
+	bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t
+											 *value);
 
 	bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value);
+	bool ququ_set_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t value);
 #endif
 
 #ifdef __cplusplus
