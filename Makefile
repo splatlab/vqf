@@ -1,4 +1,4 @@
-TARGETS= main main_tx bm
+TARGETS= main main_tx main_id bm
 
 ifdef D
 	DEBUG=-g
@@ -41,11 +41,13 @@ all: $(TARGETS)
 # dependencies between programs and .o files
 main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o
 main_tx:						$(OBJDIR)/main_tx.o $(OBJDIR)/ququ_filter.o
+main_id:						$(OBJDIR)/main_id.o $(OBJDIR)/ququ_filter.o
 bm:							$(OBJDIR)/bm.o $(OBJDIR)/ququ_filter.o
 
 # dependencies between .o files and .cc (or .c) files
 $(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
 $(OBJDIR)/main_tx.o: 			$(LOC_SRC)/main_tx.cc
+$(OBJDIR)/main_id.o: 			$(LOC_SRC)/main_id.cc
 $(OBJDIR)/bm.o: 			$(LOC_SRC)/bm.cc
 
 $(OBJDIR)/ququ_filter.o: 			$(LOC_SRC)/ququ_filter.c
