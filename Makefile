@@ -18,8 +18,8 @@ ifdef P
 	PROFILE=-pg -no-pie # for bug in gprof.
 endif
 
-CXX = g++ -std=c++11 -mavx512bw -mavx512f -frename-registers -mrtm -march=native
-CC = gcc -std=gnu11  -mavx512bw -mavx512f -frename-registers -mrtm -march=native
+CXX = g++ -std=c++11 -fgnu-tm -mavx512bw -mavx512f -frename-registers  -march=native
+CC = gcc -std=gnu11 -fgnu-tm -mavx512bw -mavx512f -frename-registers  -march=native
 LD= g++ -std=c++11
 
 LOC_INCLUDE=include
@@ -30,7 +30,7 @@ CXXFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
 
 CFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
 
-LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm
+LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm -litm
 
 #
 # declaration of dependencies

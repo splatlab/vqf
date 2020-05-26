@@ -47,7 +47,7 @@ void *insert_bm(void *arg)
 {
    args *a = (args *)arg;
    for (uint32_t i = a->start; i <= a->end; i++) {
-      int ret = ququ_insert_tx(a->cf, a->vals[i]);
+      int ret = ququ_insert(a->cf, a->vals[i]);
       if (ret < 0) {
          fprintf(stderr, "failed insertion for key: %lx.\n", a->vals[i]);
          abort();
@@ -60,7 +60,7 @@ void *query_bm(void *arg)
 {
    args *a = (args *)arg;
    for (uint32_t i = a->start; i <= a->end; i++) {
-      int ret = ququ_is_present_tx(a->cf, a->vals[i]);
+      int ret = ququ_is_present(a->cf, a->vals[i]);
       if (ret < 0) {
          fprintf(stderr, "failed insertion for key: %lx.\n", a->vals[i]);
          abort();

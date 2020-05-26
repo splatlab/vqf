@@ -196,12 +196,16 @@ ququ_filter * ququ_init(uint64_t nslots) {
 	return filter;
 }
 
+#if 0
 bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
+   bool ret;
    unsigned status = _XABORT_EXPLICIT;
    while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ququ_insert(filter, hash);
+   ret = ququ_insert(filter, hash);
    _xend();
+   return ret;
 }
+#endif
 
 // If the item goes in the i'th slot (starting from 0) in the block then
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
@@ -213,6 +217,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	uint64_t                 range              = metadata->range;
 
+   __transaction_atomic {
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
@@ -248,7 +253,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	update_tags_512(&blocks[index], slot_index,tag);
 #endif
 	update_md(block_md, select_index);
-        
+   }
 	/*print_block(filter, index);*/
 	return true;
 }
@@ -287,12 +292,16 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
 		return false;
 }
 
+#if 0
 bool ququ_remove_tx(ququ_filter * restrict filter, uint64_t hash) {
+   bool ret;
    unsigned status = _XABORT_EXPLICIT;
    while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ququ_remove(filter, hash);
+   ret = ququ_remove(filter, hash);
    _xend();
+   return ret;
 }
+#endif
 
 bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 	ququ_metadata * restrict metadata           = &filter->metadata;
@@ -317,9 +326,10 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 	__m512i bcast = _mm512_set1_epi8(tag);
+   __transaction_atomic {
 	__m512i block =
 		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+	__mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
 		// no matching tags, can bail
@@ -332,14 +342,19 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t end = lookup_128(filter->blocks[index].md, offset);
 	uint64_t mask = end - start;
 	return (mask & result) != 0;
+   }
 }
 
+#if 0
 bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash) {
+   bool ret;
    unsigned status = _XABORT_EXPLICIT;
    while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ququ_is_present(filter, hash);
+   ret = ququ_is_present(filter, hash);
    _xend();
+  return ret;
 }
+#endif
 
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
