@@ -37,6 +37,7 @@ typedef void *(*duplicate_rand)(void *state);
 typedef int (*init_op)(uint64_t nvals);
 typedef int (*insert_op)(__uint128_t val);
 typedef int (*lookup_op)(__uint128_t val);
+typedef int (*remove_op)(__uint128_t val);
 typedef __uint128_t (*get_range_op)();
 typedef int (*destroy_op)();
 
@@ -50,6 +51,7 @@ typedef struct filter {
   init_op init;
   insert_op insert;
   lookup_op lookup;
+	remove_op remove;
   get_range_op range;
   destroy_op destroy;
 } filter;
@@ -175,7 +177,7 @@ rand_generator uniform_pregen = {uniform_pregen_init, uniform_pregen_gen_rand,
 rand_generator uniform_online = {uniform_online_init, uniform_online_gen_rand,
                                  uniform_online_duplicate};
 
-filter cf = {q_init, q_insert, q_lookup, q_range, q_destroy};
+filter cf = {q_init, q_insert, q_lookup, q_remove, q_range, q_destroy};
 
 uint64_t tv2msec(struct timeval tv) {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
@@ -215,6 +217,7 @@ int main(int argc, char **argv) {
   rand_generator *vals_gen;
   void *vals_gen_state;
   void *old_vals_gen_state;
+  void *remove_vals_gen_state;
   rand_generator *othervals_gen;
   void *othervals_gen_state;
 
@@ -225,18 +228,22 @@ int main(int argc, char **argv) {
   struct timeval tv_insert[100][1];
   struct timeval tv_exit_lookup[100][1];
   struct timeval tv_false_lookup[100][1];
+  struct timeval tv_remove[100][1];
   uint64_t fps = 0;
 
   FILE *fp_insert;
   FILE *fp_exit_lookup;
   FILE *fp_false_lookup;
+  FILE *fp_remove;
   const char *dir = "./";
   const char *insert_op = "-insert.txt\0";
   const char *exit_lookup_op = "-exists-lookup.txt\0";
   const char *false_lookup_op = "-false-lookup.txt\0";
+  const char *remove_op = "-remove.txt\0";
   char filename_insert[256];
   char filename_exit_lookup[256];
   char filename_false_lookup[256];
+  char filename_remove[256];
 
   /* Argument parsing */
   int opt;
@@ -323,12 +330,17 @@ int main(int argc, char **argv) {
   snprintf(filename_false_lookup,
            strlen(dir) + strlen(outputfile) + strlen(false_lookup_op) + 1,
            "%s%s%s", dir, outputfile, false_lookup_op);
+  snprintf(filename_remove,
+           strlen(dir) + strlen(outputfile) + strlen(remove_op) + 1, "%s%s%s",
+           dir, outputfile, remove_op);
 
   fp_insert = fopen(filename_insert, "w");
   fp_exit_lookup = fopen(filename_exit_lookup, "w");
   fp_false_lookup = fopen(filename_false_lookup, "w");
+  fp_remove = fopen(filename_remove, "w");
 
-  if (fp_insert == NULL || fp_exit_lookup == NULL || fp_false_lookup == NULL) {
+	if (fp_insert == NULL || fp_exit_lookup == NULL || fp_false_lookup == NULL
+			|| fp_remove == NULL) {
     printf("Can't open the data file");
     exit(1);
   }
@@ -351,9 +363,16 @@ int main(int argc, char **argv) {
   }
   fprintf(fp_false_lookup, "\n");
 
+	fprintf(fp_remove, "x_0");
+  for (run = 0; run < nruns; run++) {
+    fprintf(fp_remove, "    y_%d", run);
+  }
+  fprintf(fp_remove, "\n");
+
   fclose(fp_insert);
   fclose(fp_exit_lookup);
   fclose(fp_false_lookup);
+  fclose(fp_remove);
 
   for (run = 0; run < nruns; run++) {
     fps = 0;
@@ -361,6 +380,7 @@ int main(int argc, char **argv) {
 
     vals_gen_state = vals_gen->init(nvals, filter_ds.range(), NULL);
     old_vals_gen_state = vals_gen->dup(vals_gen_state);
+    remove_vals_gen_state = vals_gen->dup(vals_gen_state);
     sleep(5);
     othervals_gen_state = othervals_gen->init(nvals, filter_ds.range(), NULL);
 
@@ -437,11 +457,40 @@ int main(int argc, char **argv) {
       fclose(fp_exit_lookup);
       fclose(fp_false_lookup);
     }
+
+    for (exp = 0; exp < 2 * npoints; exp += 2) {
+       fp_remove = fopen(filename_remove, "a");
+       i = (exp / 2) * (nvals / npoints);
+       j = ((exp / 2) + 1) * (nvals / npoints);
+       printf("Round: %d\n", exp / 2);
+
+       gettimeofday(&tv_remove[exp][run], NULL);
+       for (; i < j; i += 1 << 16) {
+          int nitems = j - i < 1 << 16 ? j - i : 1 << 16;
+          __uint128_t vals[1 << 16];
+          int m;
+          assert(vals_gen->gen(remove_vals_gen_state, nitems, vals) == nitems);
+
+          for (m = 0; m < nitems; m++) {
+             filter_ds.remove(vals[m]);
+          }
+       }
+       gettimeofday(&tv_remove[exp + 1][run], NULL);
+       fprintf(fp_remove, "%d", ((exp / 2) * (100 / npoints)));
+       fprintf(fp_remove, " %f\n",
+             0.001 * (nvals / npoints) /
+             (tv2msec(tv_remove[exp + 1][run]) -
+              tv2msec(tv_remove[exp][run])));
+
+       fclose(fp_remove);
+   }
+
     filter_ds.destroy();
   }
   printf("Insert Performance written to file: %s\n", filename_insert);
-  printf("Exist lookup Performance written to file: %s\n", filename_insert);
-  printf("False lookup Performance written to file: %s\n", filename_insert);
+  printf("Exist lookup Performance written to file: %s\n", filename_exit_lookup);
+  printf("False lookup Performance written to file: %s\n", filename_false_lookup);
+  printf("Remove Performance written to file: %s\n", filename_remove);
 
   printf("FP rate: %f (%lu/%lu)\n", 1.0 * fps / nvals, fps, nvals);
 

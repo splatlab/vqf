@@ -18,6 +18,8 @@
 #include <openssl/rand.h>
 #include <sys/time.h>
 
+#include <set>
+
 #include "ququ_filter.h"
 #include "shuffle_matrix_512.h"
 
@@ -68,23 +70,33 @@ int main(int argc, char **argv)
 		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
 	}
 
+        //srand(0);
+        //for (uint32_t i = 0; i < nvals; i++) {
+        //   vals[i] = (rand() % filter->metadata.range);
+        //}
+
 	struct timeval start, end;
 	struct timezone tzp;
 
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(filter, vals[i]) < 0) {
+		if (!ququ_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-	}
+         }
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
+#if VALUE_BITS == 0
 		if (!ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (!ququ_is_present(filter, vals[i], &value)) {
+#endif
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}
@@ -95,7 +107,12 @@ int main(int argc, char **argv)
   uint64_t nfps = 0;
 	/* Lookup hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
+#if VALUE_BITS == 0
 		if (ququ_is_present(filter, other_vals[i])) {
+#else
+                uint8_t value;
+		if (ququ_is_present(filter, other_vals[i], &value)) {
+#endif
       nfps++;
 		}
 	}
@@ -106,7 +123,18 @@ int main(int argc, char **argv)
          nfps, nvals,
          1.0 * nvals / nfps);
 
+        //fprintf(stdout, "Checking ququ_remove\n");
 
+	gettimeofday(&start, &tzp);
+	for (uint64_t i = 0; i < nvals; i++) {
+           ququ_remove(filter, vals[i]);
+           //if (ququ_is_present(filter, vals[i])) {
+           //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
+           //   exit(EXIT_FAILURE);
+           //}
+        }
+	gettimeofday(&end, &tzp);
+	print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
 	//* Generate random values */
@@ -132,7 +160,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (ququ_insert(filter, vals[i]) < 0) {
+		if (!ququ_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
