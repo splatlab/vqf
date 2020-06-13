@@ -217,7 +217,6 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	uint64_t                 range              = metadata->range;
 
-   __transaction_atomic {
 	uint64_t block_index = hash >> key_remainder_bits;
 	uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
 	uint64_t tag = hash & 0xff;
@@ -253,7 +252,6 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	update_tags_512(&blocks[index], slot_index,tag);
 #endif
 	update_md(block_md, select_index);
-   }
 	/*print_block(filter, index);*/
 	return true;
 }
@@ -326,7 +324,6 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 	__m512i bcast = _mm512_set1_epi8(tag);
-   __transaction_atomic {
 	__m512i block =
 		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
 	__mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
@@ -342,7 +339,6 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
 	uint64_t end = lookup_128(filter->blocks[index].md, offset);
 	uint64_t mask = end - start;
 	return (mask & result) != 0;
-   }
 }
 
 #if 0
