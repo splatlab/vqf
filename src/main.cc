@@ -23,6 +23,11 @@
 #include "ququ_filter.h"
 #include "shuffle_matrix_512.h"
 
+POBJ_LAYOUT_BEGIN(ququ);
+POBJ_LAYOUT_TOID(ququ, ququ_metadata);
+POBJ_LAYOUT_TOID(ququ, ququ_block);
+POBJ_LAYOUT_END(ququ);
+
 uint64_t tv2usec(struct timeval *tv) {
   return 1000000 * tv->tv_sec + tv->tv_usec;
 }
@@ -52,13 +57,15 @@ int main(int argc, char **argv)
 	uint64_t *vals;
 	uint64_t *other_vals;
 
-	ququ_filter *filter;	
-
+	PMEMobjpool * pop;
 	/* initialize ququ filter */
-	if ((filter = ququ_init(nslots)) == NULL) {
+	if ((pop = ququ_init(nslots)) == NULL) {
 		fprintf(stderr, "Can't allocate ququ filter.");
 		exit(EXIT_FAILURE);
 	}
+
+	TOID(ququ_metadata) ququ_md = POBJ_FIRST(pop, ququ_metadata);
+	uint64_t range = D_RO(ququ_md)->range;
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
@@ -66,13 +73,13 @@ int main(int argc, char **argv)
 	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
 	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
 	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
-		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+		vals[i] = (1 * vals[i]) % range;
+		other_vals[i] = (1 * other_vals[i]) % range;
 	}
 
         //srand(0);
         //for (uint32_t i = 0; i < nvals; i++) {
-        //   vals[i] = (rand() % filter->metadata.range);
+        //   vals[i] = (rand() % range);
         //}
 
 	struct timeval start, end;
@@ -81,7 +88,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_insert(filter, vals[i])) {
+		if (!ququ_insert(pop, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
@@ -92,10 +99,10 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
 #if VALUE_BITS == 0
-		if (!ququ_is_present(filter, vals[i])) {
+		if (!ququ_is_present(pop, vals[i])) {
 #else
                 uint8_t value;
-		if (!ququ_is_present(filter, vals[i], &value)) {
+		if (!ququ_is_present(pop, vals[i], &value)) {
 #endif
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
@@ -108,10 +115,10 @@ int main(int argc, char **argv)
 	/* Lookup hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 #if VALUE_BITS == 0
-		if (ququ_is_present(filter, other_vals[i])) {
+		if (ququ_is_present(pop, other_vals[i])) {
 #else
                 uint8_t value;
-		if (ququ_is_present(filter, other_vals[i], &value)) {
+		if (ququ_is_present(pop, other_vals[i], &value)) {
 #endif
       nfps++;
 		}
@@ -127,8 +134,8 @@ int main(int argc, char **argv)
 
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
-           ququ_remove(filter, vals[i]);
-           //if (ququ_is_present(filter, vals[i])) {
+           ququ_remove(pop, vals[i]);
+           //if (ququ_is_present(pop, vals[i])) {
            //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
            //   exit(EXIT_FAILURE);
            //}
@@ -137,7 +144,7 @@ int main(int argc, char **argv)
 	print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
-	//* Generate random values */
+	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
         uint64_t nbytes = sizeof(*vals) * nvals;
         uint8_t *ptr = (uint8_t *)vals;
@@ -150,8 +157,8 @@ int main(int argc, char **argv)
 	
 	//srand(0);
 	for (uint64_t i = 0; i < nvals; i++) {
-		//vals[i] = rand() % filter->metadata.range;
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
+		//vals[i] = rand() % range;
+		vals[i] = (1 * vals[i]) % range;
 	}
 
 	struct timeval start, end;
@@ -160,7 +167,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_insert(filter, vals[i])) {
+		if (!ququ_insert(pop, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
@@ -171,7 +178,7 @@ int main(int argc, char **argv)
 	gettimeofday(&start, &tzp);
 	/* Lookup hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_is_present(filter, vals[i])) {
+		if (!ququ_is_present(pop, vals[i])) {
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}

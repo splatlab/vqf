@@ -23,14 +23,15 @@ CC = gcc -std=gnu11 -fgnu-tm -mavx512bw -mavx512f -frename-registers  -march=nat
 LD= g++ -std=c++11
 
 LOC_INCLUDE=include
+LOC_PMDK=pmdk/src/include
 LOC_SRC=src
 OBJDIR=obj
 
-CXXFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
+CXXFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE) -I$(LOC_PMDK)
 
-CFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE)
+CFLAGS += -Wall $(DEBUG) $(PROFILE) $(OPT) $(ARCH) -m64 -I. -I$(LOC_INCLUDE) -I$(LOC_PMDK)
 
-LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm -litm
+LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm -litm -lpmemobj -lpmem
 
 #
 # declaration of dependencies

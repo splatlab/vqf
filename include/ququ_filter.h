@@ -14,12 +14,13 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <libpmemobj.h>
 
 #ifdef __cplusplus
 #define restrict __restrict__
 extern "C" {
 #endif
-
+	
 #define VALUE_BITS 0
 
 	// metadata: 1 --> end of the run
@@ -47,22 +48,20 @@ extern "C" {
 		ququ_block blocks[];
 	} ququ_filter;
 
-	ququ_filter * ququ_init(uint64_t nslots);
+	PMEMobjpool * ququ_init(uint64_t nslots);
 
-	bool ququ_insert(ququ_filter * restrict filter, uint64_t hash);
-	bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_insert(PMEMobjpool * pop, uint64_t hash);
+	bool ququ_insert_tx(PMEMobjpool * pop, uint64_t hash);
 	
-	bool ququ_remove(ququ_filter * restrict filter, uint64_t hash);
-	bool ququ_remove_tx(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_remove(PMEMobjpool * pop, uint64_t hash);
+	bool ququ_remove_tx(PMEMobjpool * pop, uint64_t hash);
 
 #if VALUE_BITS == 0
-	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash);
-	bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash);
+	bool ququ_is_present(PMEMobjpool * pop, uint64_t hash);
+	bool ququ_is_present_tx(PMEMobjpool * pop, uint64_t hash);
 #else
-	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t
-											 *value);
-	bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t
-											 *value);
+	bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash, uint8_t *value);
+	bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t *value);
 
 	bool ququ_set(ququ_filter * restrict filter, uint64_t hash, uint8_t value);
 	bool ququ_set_tx(ququ_filter * restrict filter, uint64_t hash, uint8_t value);

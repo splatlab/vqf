@@ -22,6 +22,11 @@
 
 #include "ququ_filter.h"
 
+POBJ_LAYOUT_BEGIN(ququ);
+POBJ_LAYOUT_TOID(ququ, ququ_metadata);
+POBJ_LAYOUT_TOID(ququ, ququ_block);
+POBJ_LAYOUT_END(ququ);
+
 #define ITR 100000000 
 
 uint64_t tv2usec(struct timeval *tv) {
@@ -42,7 +47,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 int main(int argc, char **argv)
 {
-   if (argc < 2) {
+  if (argc < 2) {
       fprintf(stderr, "Please specify the log of the number of slots in the CQF.\n");
       exit(1);
    }
@@ -51,14 +56,16 @@ int main(int argc, char **argv)
    uint64_t nvals = 90*nslots/100;
    uint64_t *vals;
    uint64_t *other_vals;
-
-   ququ_filter *filter;	
+	
+   PMEMobjpool * pop;
 
    /* initialize ququ filter */
-   if ((filter = ququ_init(nslots)) == NULL) {
+   if ((pop = ququ_init(nslots)) == NULL) {
       fprintf(stderr, "Can't allocate ququ filter.");
       exit(EXIT_FAILURE);
    }
+
+   uint64_t range = (D_RO(POBJ_FIRST(pop, ququ_metadata)))->range;
 
    /* Generate random values */
    vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
@@ -66,13 +73,13 @@ int main(int argc, char **argv)
    other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
    RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
    for (uint64_t i = 0; i < nvals; i++) {
-      vals[i] = (1 * vals[i]) % filter->metadata.range;
-      other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+      vals[i] = (1 * vals[i]) % range;
+      other_vals[i] = (1 * other_vals[i]) % range;
    }
 
    //srand(0);
    //for (uint32_t i = 0; i < nvals; i++) {
-   //   vals[i] = (rand() % filter->metadata.range);
+   //   vals[i] = (rand() % range);
    //}
 
    struct timeval start, end;
@@ -81,7 +88,7 @@ int main(int argc, char **argv)
    gettimeofday(&start, &tzp);
    /* Insert hashes in the ququ filter */
    for (uint64_t i = 0; i < nvals; i++) {
-      if (!ququ_insert(filter, vals[i])) {
+      if (!ququ_insert(pop, vals[i])) {
          fprintf(stderr, "Insertion failed");
          exit(EXIT_FAILURE);
       }
@@ -108,11 +115,11 @@ int main(int argc, char **argv)
    gettimeofday(&start, &tzp);
    for (uint64_t i = 0; i < ITR; i++) {
       if (oprs[i] == 0) { // delete
-         ret = ququ_remove(filter, opr_vals[i]);
+         ret = ququ_remove(pop, opr_vals[i]);
       } else if (oprs[i] == 1) { // query
-         ret = ququ_is_present(filter, opr_vals[i]);
+         ret = ququ_is_present(pop, opr_vals[i]);
       } else if (oprs[i] == 2) { // insert
-         if (!ququ_insert(filter, opr_vals[i])) {
+         if (!ququ_insert(pop, opr_vals[i])) {
             fprintf(stderr, "Insertion failed");
             exit(EXIT_FAILURE);
          }

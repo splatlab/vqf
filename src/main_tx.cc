@@ -19,6 +19,11 @@
 
 #include "ququ_filter.h"
 
+POBJ_LAYOUT_BEGIN(ququ);
+POBJ_LAYOUT_TOID(ququ, ququ_metadata);
+POBJ_LAYOUT_TOID(ququ, ququ_block);
+POBJ_LAYOUT_END(ququ);
+
 uint64_t tv2usec(struct timeval *tv) {
   return 1000000 * tv->tv_sec + tv->tv_usec;
 }
@@ -37,7 +42,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 
 typedef struct args {
-	ququ_filter *cf;
+	PMEMobjpool *cf;
 	uint64_t *vals;
 	uint64_t start;
 	uint64_t end;
@@ -104,24 +109,26 @@ int main(int argc, char **argv)
 	uint64_t nvals = 900*nslots/1000;
 
 	uint64_t *vals;
-        ququ_filter *filter;	
+        PMEMobjpool *pop;	
 
 	/* initialize ququ filter */
-	if ((filter = ququ_init(nslots)) == NULL) {
+	if ((pop = ququ_init(nslots)) == NULL) {
 		fprintf(stderr, "Can't allocate ququ filter.");
 		exit(EXIT_FAILURE);
 	}
+
+	uint64_t range = (D_RO(POBJ_FIRST(pop, ququ_metadata)))->range;
 
 	/* Generate random values */
 	vals = (uint64_t*)calloc(nvals, sizeof(vals[0]));
 	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	for (uint32_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
+		vals[i] = (1 * vals[i]) % range;
 	}
 	
 	args *arg = (args*)malloc(tcnt * sizeof(args));
 	for (uint32_t i = 0; i < tcnt; i++) {
-		arg[i].cf = filter;
+		arg[i].cf = pop;
 		arg[i].vals = vals;
 		arg[i].start = (nvals/tcnt) * i;
 		arg[i].end = (nvals/tcnt) * (i + 1) - 1;
@@ -139,7 +146,7 @@ int main(int argc, char **argv)
 	//fprintf(stdout, "Inserted all items: %ld\n", arg[tcnt-1].end);
 
 	for (uint64_t i = 0; i < arg[tcnt-1].end; i++) {
-           if (!ququ_is_present(filter, vals[i])) {
+           if (!ququ_is_present(pop, vals[i])) {
               fprintf(stderr, "Lookup failed for %ld", vals[i]);
               exit(EXIT_FAILURE);
            }
