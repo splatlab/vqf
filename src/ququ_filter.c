@@ -220,28 +220,7 @@ PMEMobjpool * ququ_init(uint64_t nslots) {
 	
 	printf("Size: %ld\n", total_size_in_bytes);
 	return setup_pop(total_blocks, total_size_in_bytes);
-
-  //	filter = (ququ_filter *)malloc(sizeof(*filter) + total_size_in_bytes);
-//	printf("Size: %ld\n",total_size_in_bytes);
- // 	assert(filter);
-  
-	
-//	filter->metadata.total_size_in_bytes = total_size_in_bytes;
-//	filter->metadata.nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
-//	filter->metadata.key_remainder_bits = 8;
-//	filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
-//	filter->metadata.nblocks = total_blocks;
-//	filter->metadata.nelts = 0;
-
-	// memset to 1
-//	for (uint64_t i = 0; i < total_blocks; i++) {
-//		filter->blocks[i].md[0] = UINT64_MAX;
-//		filter->blocks[i].md[1] = UINT64_MAX;
-//	}
-	
-//	return filter;
 }
-
 #if 0
 bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
    bool ret;
@@ -258,60 +237,67 @@ bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
 // by 1 bit.
 // Insert the new tag at the end of its run and shift the rest by 1 slot.
 bool ququ_insert(PMEMobjpool * pop, uint64_t hash) {
-	ququ_metadata * restrict metadata           = D_RW(POBJ_FIRST(pop, ququ_metadata));
+	const ququ_metadata * restrict metadata     = D_RO(POBJ_FIRST(pop, ququ_metadata));
 	ququ_block    * restrict blocks             = D_RW(POBJ_FIRST(pop, ququ_block));
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	uint64_t                 range              = metadata->range;
 
 	uint64_t block_index = hash >> key_remainder_bits;
-	uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+	ququ_block main_block = blocks[block_index / QUQU_BUCKETS_PER_BLOCK];
+	uint64_t *block_md = main_block.md;
 	uint64_t tag = hash & 0xff;
 	uint64_t block_free = get_block_free_space(block_md);
 	uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-
+	
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
-
+	ququ_block alt_block = blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK];
+	
+	bool use_alt = false;
+	uint64_t *alt_block_md;
+	
 	if (block_free < QUQU_CHECK_ALT) {
-		uint64_t *alt_block_md = blocks[alt_block_index     / QUQU_BUCKETS_PER_BLOCK].md;
+		alt_block_md = alt_block.md;
 		uint64_t alt_block_free = get_block_free_space(alt_block_md);
 		// pick the least loaded block
 		if (alt_block_free > block_free) {
-			block_index = alt_block_index;
-			block_md = alt_block_md;
+			use_alt = true;
+			//block_index = alt_block_index;
+			//block_md = alt_block_md;
 		} else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
 			// fprintf(stderr, "ququ filter is full.");
-		//	exit(EXIT_FAILURE);
+			//exit(EXIT_FAILURE);
 		}
 	}
 
-	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
-	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
-
-	uint64_t slot_index = select_128(block_md, offset);
-        uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
-	/*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
-	/*print_block(filter, index);*/
-
-#if 0
-	update_tags(&blocks[index], slot_index,	tag);
-#else
-	update_tags_512(&blocks[index], slot_index,tag);
-#endif
-	update_md(block_md, select_index);
-	/*print_block(filter, index);*/
+	if(!use_alt) {
+		uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
+		uint64_t slot_index = select_128(block_md, offset);
+        	uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
+		update_tags_512(&main_block, slot_index,tag);
+		update_md(block_md, select_index);
+		blocks[block_index / QUQU_BUCKETS_PER_BLOCK] = main_block;
+	} else {
+		uint64_t offset = alt_block_index % QUQU_BUCKETS_PER_BLOCK;
+		uint64_t slot_index = select_128(alt_block_md, offset);
+		uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
+		update_tags_512(&alt_block, slot_index, tag);
+		update_md(alt_block_md, select_index);
+		blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK] = alt_block;
+	}
 	return true;
 }
 
-static inline bool remove_tags(PMEMobjpool * pop, uint8_t tag,
+static inline bool remove_tags(uint8_t tag, ququ_block * restrict blocks,
 															 uint64_t block_index) {
-	ququ_block    * restrict blocks             = D_RW(POBJ_FIRST(pop, ququ_block));
-
+	
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+	ququ_block cur_block = blocks[index];
+
 	__m512i bcast = _mm512_set1_epi8(tag);
 	__m512i block =
-		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&blocks[index]));
+		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&cur_block));
 	volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
@@ -319,7 +305,7 @@ static inline bool remove_tags(PMEMobjpool * pop, uint8_t tag,
 		return false;
 	}
 
-	uint64_t start = offset != 0 ? lookup_128(blocks[index].md, offset -
+	uint64_t start = offset != 0 ? lookup_128(cur_block.md, offset -
 																						1) : one[0] << 2 *
 		sizeof(uint64_t);
 	uint64_t end = lookup_128(blocks[index].md, offset);
@@ -327,11 +313,12 @@ static inline bool remove_tags(PMEMobjpool * pop, uint8_t tag,
 	
 	uint64_t check_indexes = mask & result;
 	if (check_indexes != 0) { // remove the first available tag
-		uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+		uint64_t *block_md = cur_block.md;
 		uint64_t remove_index = __builtin_ctzll(check_indexes);
-		remove_tags_512(&blocks[index], remove_index);
+		remove_tags_512(&cur_block, remove_index);
                 remove_index = remove_index + offset - sizeof(__uint128_t);
 		remove_md(block_md, remove_index);
+		blocks[index] = cur_block;
 		return true;
 	} else
 		return false;
@@ -350,7 +337,7 @@ bool ququ_remove_tx(ququ_filter * restrict filter, uint64_t hash) {
 
 bool ququ_remove(PMEMobjpool * pop, uint64_t hash) {
 
-	ququ_metadata * restrict metadata           = D_RW(POBJ_FIRST(pop, ququ_metadata));
+	const ququ_metadata * restrict metadata     = D_RO(POBJ_FIRST(pop, ququ_metadata));
 	ququ_block    * restrict blocks             = D_RW(POBJ_FIRST(pop, ququ_block));
 
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
@@ -362,22 +349,23 @@ bool ququ_remove(PMEMobjpool * pop, uint64_t hash) {
 
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-	return remove_tags(pop, tag, block_index) || remove_tags(pop, tag, alt_block_index);
+	return remove_tags(tag, blocks, block_index) || remove_tags(tag, blocks, alt_block_index);
 
 }
 
 #if VALUE_BITS == 0
 
-static inline bool check_tags(PMEMobjpool * pop, uint8_t tag,
+static inline bool check_tags(uint8_t tag, const ququ_block * restrict blocks,
 															uint64_t block_index) {
-	ququ_block    * restrict blocks             = D_RW(POBJ_FIRST(pop, ququ_block));
 
 	uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
 	uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+	ququ_block cur_block = blocks[index];
+
 	__m512i bcast = _mm512_set1_epi8(tag);
 	__m512i block =
-		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&blocks[index]));
+		_mm512_loadu_si512(reinterpret_cast<__m512i*>(&cur_block));
 	__mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 
 	if (result == 0) {
@@ -385,10 +373,10 @@ static inline bool check_tags(PMEMobjpool * pop, uint8_t tag,
 		return false;
 	}
 
-	uint64_t start = offset != 0 ? lookup_128(blocks[index].md, offset -
+	uint64_t start = offset != 0 ? lookup_128(cur_block.md, offset -
 																						1) : one[0] << 2 *
 		sizeof(uint64_t);
-	uint64_t end = lookup_128(blocks[index].md, offset);
+	uint64_t end = lookup_128(cur_block.md, offset);
 	uint64_t mask = end - start;
 	return (mask & result) != 0;
 }
@@ -409,8 +397,8 @@ bool ququ_is_present_tx(ququ_filter * restrict filter, uint64_t hash) {
 bool ququ_is_present(PMEMobjpool * pop, uint64_t hash) {
 
 	
-	ququ_block    * restrict blocks             = D_RW(POBJ_FIRST(pop, ququ_block));
-	ququ_metadata * restrict metadata           = D_RW(POBJ_FIRST(pop, ququ_metadata));
+	const ququ_block    * restrict blocks             = D_RO(POBJ_FIRST(pop, ququ_block));
+	const ququ_metadata * restrict metadata           = D_RO(POBJ_FIRST(pop, ququ_metadata));
 	//ququ_block    * restrict blocks             = filter->blocks;
 	uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
 	uint64_t                 range              = metadata->range;
@@ -424,7 +412,7 @@ bool ququ_is_present(PMEMobjpool * pop, uint64_t hash) {
 	__builtin_prefetch(&blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
 	//if (block_free < QUQU_CHECK_ALT) {
-	return check_tags(pop, tag, block_index) || check_tags(pop, tag, alt_block_index);
+	return check_tags(tag, blocks, block_index) || check_tags(tag, blocks, alt_block_index);
 	// } else {
 	//    return check_tags(filter, tag, block_index); 
 	//}

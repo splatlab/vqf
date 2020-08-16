@@ -20,7 +20,7 @@
 #define restrict __restrict__
 extern "C" {
 #endif
-	
+
 #define VALUE_BITS 0
 
 	// metadata: 1 --> end of the run
