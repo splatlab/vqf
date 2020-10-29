@@ -3,8 +3,8 @@
  *
  *       Filename:  ququ_filter.h
  *
- *         Author:  Prashant Pandey (), ppandey2@cs.cmu.edu
- *   Organization:  Carnegie Mellon University
+ *         Author:  Prashant Pandey (), ppandey@berkeley.edu
+ *   Organization: 	LBNL/UCB 
  *
  * ============================================================================
  */
@@ -22,16 +22,37 @@ extern "C" {
 
 #define VALUE_BITS 0
 
+#define TAG_BITS 8
+
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
 	// run.
 
-	// We are using 8-bit slots.
-	// One block consists of 48 8-bit slots covering 80 buckets, and 80+48 = 128 bits of metadata.
+#if TAG_BITS == 8
+	// We are using 8-bit tags.
+	// One block consists of 48 8-bit slots covering 80 buckets, and 80+48 = 128
+	// bits of metadata.
 	typedef struct __attribute__ ((__packed__)) ququ_block {
 		uint64_t md[2];
 		uint8_t tags[48];
 	} ququ_block;
+#elif TAG_BITS == 12
+	// We are using 12-bit tags.
+	// One block consists of 32 12-bit slots covering 96 buckets, and 96+32 = 128
+	// bits of metadata.
+	typedef struct __attribute__ ((__packed__)) ququ_block {
+		uint64_t md[2];
+		uint8_t tags[48]; // 32 12-bit tags
+	} ququ_block;
+#elif TAG_BITS == 16 
+	// We are using 16-bit tags.
+	// One block consists of 28 16-bit slots covering 36 buckets, and 36+28 = 64
+	// bits of metadata.
+	typedef struct __attribute__ ((__packed__)) ququ_block {
+		uint64_t md;
+		uint16_t tags[28];
+	} ququ_block;
+#endif
 
 	typedef struct ququ_metadata {
 		uint64_t total_size_in_bytes;

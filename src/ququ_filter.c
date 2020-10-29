@@ -3,8 +3,8 @@
  *
  *       Filename:  ququ_filter.c
  *
- *         Author:  Prashant Pandey (), ppandey2@cs.cmu.edu
- *   Organization:  Carnegie Mellon University
+ *         Author:  Prashant Pandey (), ppandey@berkeley.edu
+ *   Organization:  LBNL/UCB
  *
  * ============================================================================
  */
@@ -23,9 +23,21 @@
 #include "ququ_filter.h"
 #include "ququ_precompute.h"
 
+// ALT block check is set of 75% of the number of slots
+#if TAG_BITS == 8
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
 #define QUQU_CHECK_ALT 92
+#elif TAG_BITS == 12
+#define QUQU_SLOTS_PER_BLOCK 32
+#define QUQU_BUCKETS_PER_BLOCK 96
+#define QUQU_CHECK_ALT 104
+#elif TAG_BITS == 16
+#define QUQU_SLOTS_PER_BLOCK 28 
+#define QUQU_BUCKETS_PER_BLOCK 36
+#define QUQU_CHECK_ALT 43 
+#endif
+
 
 static inline int word_rank(uint64_t val) {
 	return __builtin_popcountll(val);
@@ -91,7 +103,8 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 	printf("block index: %ld\n", block_index);
 	printf("metadata: ");
 	uint64_t *md = filter->blocks[block_index].md;
-	print_bits(*(__uint128_t *)md, QUQU_BUCKETS_PER_BLOCK + QUQU_SLOTS_PER_BLOCK);
+	print_bits(*(__uint128_t *)md, QUQU_BUCKETS_PER_BLOCK +
+						 QUQU_SLOTS_PER_BLOCK);
 	printf("tags: ");
 	print_tags(filter->blocks[block_index].tags, QUQU_SLOTS_PER_BLOCK);
 }
@@ -103,7 +116,6 @@ static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8
 }
 
 #else
-
 static inline void update_tags_512(ququ_block * restrict block, uint8_t index,
 																	 uint8_t tag) {
 	block->tags[47] = tag;	// add tag at the end
@@ -119,15 +131,17 @@ static inline void remove_tags_512(ququ_block * restrict block, uint8_t index) {
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
-#define QUQU_CHECK_ALT 92
-inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i & shuffle) 
+// Shuffle using AVX2
+inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i &
+																	shuffle) 
 { 
- 	 return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle, K[0])), 
- 			 _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E), _mm256_add_epi8(shuffle, K[1]))); 
+	 return _mm256_or_si256(_mm256_shuffle_epi8(value, _mm256_add_epi8(shuffle,
+																																		 K[0])), 
+			 _mm256_shuffle_epi8(_mm256_permute4x64_epi64(value, 0x4E),
+													 _mm256_add_epi8(shuffle, K[1]))); 
 } 
 
 #define SHUFFLE_SIZE 32
-
 void shuffle_256(uint8_t * restrict source, __m256i shuffle) {
   __m256i vector = _mm256_loadu_si256(reinterpret_cast<__m256i*>(source)); 
 
