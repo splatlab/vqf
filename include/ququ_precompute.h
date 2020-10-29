@@ -3,8 +3,8 @@
  *
  *       Filename:  ququ_precompute.h
  *
- *         Author:  Prashant Pandey (), ppandey2@cs.cmu.edu
- *   Organization:  Carnegie Mellon University
+ *         Author:  Prashant Pandey (), ppandey@berkeley.edu
+ *   Organization:  LBNL/UCB
  *
  * ============================================================================
  */
