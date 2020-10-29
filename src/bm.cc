@@ -179,6 +179,10 @@ rand_generator uniform_online = {uniform_online_init, uniform_online_gen_rand,
 
 filter cf = {q_init, q_insert, q_lookup, q_remove, q_range, q_destroy};
 
+uint64_t tv2usec(struct timeval tv) {
+  return 1000000 * tv.tv_sec + tv.tv_usec;
+}
+
 uint64_t tv2msec(struct timeval tv) {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
@@ -407,9 +411,9 @@ int main(int argc, char **argv) {
       gettimeofday(&tv_insert[exp + 1][run], NULL);
       fprintf(fp_insert, "%d", ((exp / 2) * (100 / npoints)));
       fprintf(fp_insert, " %f\n",
-              0.001 * (nvals / npoints) /
-                  (tv2msec(tv_insert[exp + 1][run]) -
-                   tv2msec(tv_insert[exp][run])));
+               1.0 * (nvals / npoints) /
+                  (tv2usec(tv_insert[exp + 1][run]) -
+                   tv2usec(tv_insert[exp][run])));
 
       i = (exp / 2) * (nvals / 20);
       gettimeofday(&tv_exit_lookup[exp][run], NULL);
@@ -430,9 +434,9 @@ int main(int argc, char **argv) {
       gettimeofday(&tv_exit_lookup[exp + 1][run], NULL);
       fprintf(fp_exit_lookup, "%d", ((exp / 2) * (100 / npoints)));
       fprintf(fp_exit_lookup, " %f\n",
-              0.001 * (nvals / npoints) /
-                  (tv2msec(tv_exit_lookup[exp + 1][run]) -
-                   tv2msec(tv_exit_lookup[exp][run])));
+              1.0 * (nvals / npoints) /
+                  (tv2usec(tv_exit_lookup[exp + 1][run]) -
+                   tv2usec(tv_exit_lookup[exp][run])));
 
       i = (exp / 2) * (nvals / 20);
       gettimeofday(&tv_false_lookup[exp][run], NULL);
@@ -449,9 +453,9 @@ int main(int argc, char **argv) {
       gettimeofday(&tv_false_lookup[exp + 1][run], NULL);
       fprintf(fp_false_lookup, "%d", ((exp / 2) * (100 / npoints)));
       fprintf(fp_false_lookup, " %f\n",
-              0.001 * (nvals / npoints) /
-                  (tv2msec(tv_false_lookup[exp + 1][run]) -
-                   tv2msec(tv_false_lookup[exp][run])));
+              1.0 * (nvals / npoints) /
+                  (tv2usec(tv_false_lookup[exp + 1][run]) -
+                   tv2usec(tv_false_lookup[exp][run])));
 
       fclose(fp_insert);
       fclose(fp_exit_lookup);
@@ -478,9 +482,9 @@ int main(int argc, char **argv) {
        gettimeofday(&tv_remove[exp + 1][run], NULL);
        fprintf(fp_remove, "%d", ((exp / 2) * (100 / npoints)));
        fprintf(fp_remove, " %f\n",
-             0.001 * (nvals / npoints) /
-             (tv2msec(tv_remove[exp + 1][run]) -
-              tv2msec(tv_remove[exp][run])));
+             1.0 * (nvals / npoints) /
+             (tv2usec(tv_remove[exp + 1][run]) -
+              tv2usec(tv_remove[exp][run])));
 
        fclose(fp_remove);
    }

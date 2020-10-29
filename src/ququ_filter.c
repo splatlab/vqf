@@ -18,8 +18,8 @@
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 
-#include "shuffle_matrix_256.h"
-#include "shuffle_matrix_512.h"
+//#include "shuffle_matrix_256.h"
+//#include "shuffle_matrix_512.h"
 #include "ququ_filter.h"
 #include "ququ_precompute.h"
 
@@ -38,6 +38,8 @@
 #define QUQU_CHECK_ALT 43 
 #endif
 
+extern __m512i SHUFFLE [];
+extern __m512i SHUFFLE_REMOVE [];
 
 static inline int word_rank(uint64_t val) {
 	return __builtin_popcountll(val);
@@ -130,7 +132,9 @@ static inline void remove_tags_512(ququ_block * restrict block, uint8_t index) {
 	vector = _mm512_permutexvar_epi8(SHUFFLE_REMOVE[index], vector);
 	_mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
+#endif
 
+#if 0
 // Shuffle using AVX2
 inline __m256i cross_lane_shuffle(const __m256i & value, const __m256i &
 																	shuffle) 

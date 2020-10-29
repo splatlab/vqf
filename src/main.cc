@@ -21,7 +21,6 @@
 #include <set>
 
 #include "ququ_filter.h"
-#include "shuffle_matrix_512.h"
 
 uint64_t tv2usec(struct timeval *tv) {
   return 1000000 * tv->tv_sec + tv->tv_usec;
