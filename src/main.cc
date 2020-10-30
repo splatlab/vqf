@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	struct timezone tzp;
 
 	gettimeofday(&start, &tzp);
-	/* Insert hashes in the quq
+	/* Insert hashes in the ququ filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 		if (!ququ_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");

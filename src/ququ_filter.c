@@ -302,6 +302,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
    uint64_t                 range              = metadata->range;
 
+   uint64_t block_index = hash >> key_remainder_bits;
 #if TAG_BITS == 8
    uint64_t *block_md = blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t block_free = get_block_free_space(block_md);
@@ -310,7 +311,6 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t block_free = get_block_free_space(block_md);
 #endif
    uint64_t tag = hash & TAG_MASK;
-   uint64_t block_index = hash >> key_remainder_bits;
    uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
    __builtin_prefetch(&blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
@@ -356,15 +356,22 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    return true;
 }
 
-static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
+static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
       uint64_t block_index) {
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+#if TAG_BITS == 8
    __m512i bcast = _mm512_set1_epi8(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#elif TAG_BITS == 16
+   __m512i bcast = _mm512_set1_epi16(tag);
+   __m512i block =
+      _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+   volatile __mmask64 result = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 
    if (result == 0) {
       // no matching tags, can bail
@@ -372,15 +379,14 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint8_t tag,
    }
 
    uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 *
-      sizeof(uint64_t);
+	 1) : one[0] << 2 * sizeof(uint64_t);
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
    uint64_t mask = end - start;
 
    uint64_t check_indexes = mask & result;
    if (check_indexes != 0) { // remove the first available tag
       ququ_block    * restrict blocks             = filter->blocks;
-      uint64_t *block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
+      uint64_t *block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
       uint64_t remove_index = __builtin_ctzll(check_indexes);
       remove_tags_512(&blocks[index], remove_index);
       remove_index = remove_index + offset - sizeof(__uint128_t);
@@ -418,15 +424,22 @@ bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 
 #if VALUE_BITS == 0
 
-static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
+static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
       uint64_t block_index) {
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+#if TAG_BITS == 8
    __m512i bcast = _mm512_set1_epi8(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#elif TAG_BITS == 16
+   __m512i bcast = _mm512_set1_epi16(tag);
+   __m512i block =
+      _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
+   __mmask64 result = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 
    if (result == 0) {
       // no matching tags, can bail
@@ -434,8 +447,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint8_t tag,
    }
 
    uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 *
-      sizeof(uint64_t);
+	 1) : one[0] << 2 * sizeof(uint64_t);
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
    uint64_t mask = end - start;
    return (mask & result) != 0;
