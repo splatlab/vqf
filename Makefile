@@ -39,11 +39,12 @@ LDFLAGS += $(DEBUG) $(PROFILE) $(OPT) -lpthread -lssl -lcrypto -lm -litm
 all: $(TARGETS)
 
 # dependencies between programs and .o files
-main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o
-main_id:						$(OBJDIR)/main_id.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o
-bm:							$(OBJDIR)/bm.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o
+main:							$(OBJDIR)/main.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o
+main_id:						$(OBJDIR)/main_id.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o
+bm:							$(OBJDIR)/bm.o $(OBJDIR)/ququ_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o
 
 # dependencies between .o files and .cc (or .c) files
+$(OBJDIR)/shuffle_matrix_512_16.o: 	$(LOC_SRC)/shuffle_matrix_512_16.c
 $(OBJDIR)/shuffle_matrix_512.o: 	$(LOC_SRC)/shuffle_matrix_512.c
 $(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
 $(OBJDIR)/main_id.o: 			$(LOC_SRC)/main_id.cc
