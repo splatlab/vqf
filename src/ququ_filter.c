@@ -18,8 +18,6 @@
 #include <immintrin.h>  // portable to all x86 compilers
 #include <tmmintrin.h>
 
-//#include "shuffle_matrix_256.h"
-//#include "shuffle_matrix_512.h"
 #include "ququ_filter.h"
 #include "ququ_precompute.h"
 
@@ -30,6 +28,7 @@
 #define QUQU_BUCKETS_PER_BLOCK 80
 #define QUQU_CHECK_ALT 92
 #elif TAG_BITS == 12
+#define TAG_MASK 0xfff
 #define QUQU_SLOTS_PER_BLOCK 32
 #define QUQU_BUCKETS_PER_BLOCK 96
 #define QUQU_CHECK_ALT 104
@@ -39,8 +38,6 @@
 #define QUQU_BUCKETS_PER_BLOCK 36
 #define QUQU_CHECK_ALT 43 
 #endif
-
-
 
 extern __m512i SHUFFLE [];
 extern __m512i SHUFFLE_REMOVE [];
@@ -71,6 +68,13 @@ static inline int64_t select_128_old(__uint128_t vector, uint64_t rank) {
    return word_select(higher_word, rank) + 64;
 }
 
+static inline uint64_t lookup_64(uint64_t vector, uint64_t rank) {
+   uint64_t lower_word = vector;
+   uint64_t lower_rank = word_rank(lower_word);
+   uint64_t lower_return = _pdep_u64(one[rank], lower_word) >> rank << sizeof(uint64_t);
+   return lower_return;
+}
+
 static inline uint64_t lookup_128(uint64_t *vector, uint64_t rank) {
    uint64_t lower_word = vector[0];
    uint64_t lower_rank = word_rank(lower_word);
@@ -80,6 +84,10 @@ static inline uint64_t lookup_128(uint64_t *vector, uint64_t rank) {
    uint64_t higher_return = _pdep_u64(one[higher_rank], higher_word);
    higher_return <<= (64 + sizeof(__uint128_t) - rank);
    return lower_return + higher_return;
+}
+
+static inline int64_t select_64(uint64_t vector, uint64_t rank) {
+   return _tzcnt_u64(lookup_64(vector, rank));
 }
 
 static inline int64_t select_128(uint64_t *vector, uint64_t rank) {
@@ -340,8 +348,8 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t slot_index = select_128(block_md, offset);
    uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
 #elif
-   uint64_t select_index = word_select(block_md, offset);
-   uint64_t slot_index = select_index - offset + sizeof(uint64_t);
+   uint64_t slot_index = select_64(block_md, offset);
+   uint64_t select_index = slot_index + offset - sizeof(uint64_t);
 #endif
    /*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
    /*print_block(filter, index);*/
@@ -378,19 +386,31 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
       return false;
    }
 
+#if TAG_BITS == 8
    uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
 	 1) : one[0] << 2 * sizeof(uint64_t);
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
+#elif TAG_BITS == 16
+   uint64_t start = offset != 0 ? lookup_64(filter->blocks[index].md, offset -
+	 1) : one[0] << 2 * sizeof(uint64_t);
+   uint64_t end = lookup_64(filter->blocks[index].md, offset);
+#endif
    uint64_t mask = end - start;
 
    uint64_t check_indexes = mask & result;
    if (check_indexes != 0) { // remove the first available tag
       ququ_block    * restrict blocks             = filter->blocks;
-      uint64_t *block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
       uint64_t remove_index = __builtin_ctzll(check_indexes);
       remove_tags_512(&blocks[index], remove_index);
+#if TAG_BITS == 8
       remove_index = remove_index + offset - sizeof(__uint128_t);
+      uint64_t *block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
       remove_md(block_md, remove_index);
+#elif TAG_BITS == 16
+      remove_index = remove_index + offset - sizeof(uint64_t);
+      uint64_t block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
+      remove_md(block_md, remove_index);
+#endif
       return true;
    } else
       return false;
@@ -446,9 +466,15 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
       return false;
    }
 
+#if TAG_BITS == 8
    uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
 	 1) : one[0] << 2 * sizeof(uint64_t);
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
+#elif TAG_BITS == 16
+   uint64_t start = offset != 0 ? lookup_64(filter->blocks[index].md, offset -
+	 1) : one[0] << 2 * sizeof(uint64_t);
+   uint64_t end = lookup_64(filter->blocks[index].md, offset);
+#endif
    uint64_t mask = end - start;
    return (mask & result) != 0;
 }
