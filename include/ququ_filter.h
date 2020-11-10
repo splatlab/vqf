@@ -22,7 +22,7 @@ extern "C" {
 
 #define VALUE_BITS 0
 
-#define TAG_BITS 8
+#define TAG_BITS 16
 
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
@@ -49,8 +49,8 @@ extern "C" {
 	// One block consists of 28 16-bit slots covering 36 buckets, and 36+28 = 64
 	// bits of metadata.
 	typedef struct __attribute__ ((__packed__)) ququ_block {
-		uint64_t md;
-		uint16_t tags[28];
+		uint64_t md[2];
+		uint16_t tags[56];
 	} ququ_block;
 #endif
 

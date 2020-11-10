@@ -41,6 +41,8 @@
 
 extern __m512i SHUFFLE [];
 extern __m512i SHUFFLE_REMOVE [];
+extern __m512i SHUFFLE16 [];
+extern __m512i SHUFFLE_REMOVE16 [];
 
 static inline int word_rank(uint64_t val) {
    return __builtin_popcountll(val);
@@ -69,9 +71,7 @@ static inline int64_t select_128_old(__uint128_t vector, uint64_t rank) {
 }
 
 static inline uint64_t lookup_64(uint64_t vector, uint64_t rank) {
-   uint64_t lower_word = vector;
-   uint64_t lower_rank = word_rank(lower_word);
-   uint64_t lower_return = _pdep_u64(one[rank], lower_word) >> rank << sizeof(uint64_t);
+   uint64_t lower_return = _pdep_u64(one[rank], vector) >> rank << (sizeof(uint64_t)/2);
    return lower_return;
 }
 
@@ -176,13 +176,13 @@ static inline void update_tags_512(ququ_block * restrict block, uint8_t index, u
    block->tags[27] = tag;	// add tag at the end
 
    __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
-   vector = _mm512_permutexvar_epi8(SHUFFLE16[index], vector);
+   vector = _mm512_permutexvar_epi16(SHUFFLE16[index], vector);
    _mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 
 static inline void remove_tags_512(ququ_block * restrict block, uint8_t index) {
    __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
-   vector = _mm512_permutexvar_epi8(SHUFFLE_REMOVE16[index], vector);
+   vector = _mm512_permutexvar_epi16(SHUFFLE_REMOVE16[index], vector);
    _mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
 }
 #endif
@@ -239,12 +239,12 @@ static inline uint64_t get_block_free_space(uint64_t *vector) {
    return word_rank(lower_word) + word_rank(higher_word);
 }
 #elif TAG_BITS == 16
-static inline void update_md(uint64_t md, uint8_t index) {
-   md = _pext_u64(md, low_order_pdep_table[index]);
+static inline void update_md(uint64_t *md, uint8_t index) {
+   *md = _pdep_u64(*md, low_order_pdep_table[index]);
 }
 
-static inline void remove_md(uint64_t md, uint8_t index) {
-   md = _pext_u64(md, low_order_pdep_table[index]) | (1ULL << 63);
+static inline void remove_md(uint64_t *md, uint8_t index) {
+   *md = _pext_u64(*md, low_order_pdep_table[index]) | (1ULL << 63);
 }
 
 // number of 0s in the metadata is the number of tags.
@@ -315,8 +315,8 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t *block_md = blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t block_free = get_block_free_space(block_md);
 #elif TAG_BITS == 16
-   uint64_t block_md = blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
-   uint64_t block_free = get_block_free_space(block_md);
+   uint64_t *block_md = &blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
+   uint64_t block_free = get_block_free_space(*block_md);
 #endif
    uint64_t tag = hash & TAG_MASK;
    uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
@@ -328,28 +328,32 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
       uint64_t *alt_block_md = blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK].md;
       uint64_t alt_block_free = get_block_free_space(alt_block_md);
 #elif TAG_BITS == 16
-      uint64_t alt_block_md = blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK].md;
-      uint64_t alt_block_free = get_block_free_space(alt_block_md);
+      uint64_t *alt_block_md = &blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK].md;
+      uint64_t alt_block_free = get_block_free_space(*alt_block_md);
 #endif
       // pick the least loaded block
       if (alt_block_free > block_free) {
 	 block_index = alt_block_index;
 	 block_md = alt_block_md;
       } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
-	 // fprintf(stderr, "ququ filter is full.");
-	 //	exit(EXIT_FAILURE);
+	 fprintf(stderr, "ququ filter is full.");
+         exit(EXIT_FAILURE);
       }
    }
 
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
+   if (hash == 1811892519) {
+      printf("Tag: %d Block free: %d\n", tag, block_free);
+      print_block(filter, index);
+   }
 #if TAG_BITS == 8
    uint64_t slot_index = select_128(block_md, offset);
    uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
-#elif
-   uint64_t slot_index = select_64(block_md, offset);
-   uint64_t select_index = slot_index + offset - sizeof(uint64_t);
+#elif TAG_BITS == 16
+   uint64_t slot_index = select_64(*block_md, offset);
+   uint64_t select_index = slot_index + offset - (sizeof(uint64_t)/2);
 #endif
    /*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
    /*print_block(filter, index);*/
@@ -360,6 +364,8 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    update_tags_512(&blocks[index], slot_index,tag);
 #endif
    update_md(block_md, select_index);
+   if (hash == 1811892519)
+      print_block(filter, index);
    /*print_block(filter, index);*/
    return true;
 }
@@ -392,7 +398,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
 #elif TAG_BITS == 16
    uint64_t start = offset != 0 ? lookup_64(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 * sizeof(uint64_t);
+	 1) : one[0] << (sizeof(uint64_t)/2);
    uint64_t end = lookup_64(filter->blocks[index].md, offset);
 #endif
    uint64_t mask = end - start;
@@ -408,7 +414,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
       remove_md(block_md, remove_index);
 #elif TAG_BITS == 16
       remove_index = remove_index + offset - sizeof(uint64_t);
-      uint64_t block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
+      uint64_t *block_md = &blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
       remove_md(block_md, remove_index);
 #endif
       return true;
@@ -472,7 +478,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
 #elif TAG_BITS == 16
    uint64_t start = offset != 0 ? lookup_64(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 * sizeof(uint64_t);
+	 1) : one[0] << (sizeof(uint64_t)/2);
    uint64_t end = lookup_64(filter->blocks[index].md, offset);
 #endif
    uint64_t mask = end - start;

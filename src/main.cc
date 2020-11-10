@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 	}
 	uint64_t qbits = atoi(argv[1]);
 	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 90*nslots/100;
+	uint64_t nvals = 50*nslots/100;
 	uint64_t *vals;
 	uint64_t *other_vals;
 
@@ -66,18 +66,18 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+	//RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
 	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
 	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
 	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
+		//vals[i] = (1 * vals[i]) % filter->metadata.range;
 		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
 	}
 
-        //srand(0);
-        //for (uint32_t i = 0; i < nvals; i++) {
-        //   vals[i] = (rand() % filter->metadata.range);
-        //}
+        srand(0);
+        for (uint32_t i = 0; i < nvals; i++) {
+           vals[i] = (rand() % filter->metadata.range);
+        }
 
 	struct timeval start, end;
 	struct timezone tzp;
@@ -89,6 +89,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
+#if VALUE_BITS == 0
+		if (!ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (!ququ_is_present(filter, vals[i], &value)) {
+#endif
+			fprintf(stderr, "Lookup failed for %ld", vals[i]);
+			exit(EXIT_FAILURE);
+                }
+
          }
 	gettimeofday(&end, &tzp);
 	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
