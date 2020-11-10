@@ -48,9 +48,9 @@ extern "C" {
 	// We are using 16-bit tags.
 	// One block consists of 28 16-bit slots covering 36 buckets, and 36+28 = 64
 	// bits of metadata.
-	typedef struct __attribute__ ((__packed__)) ququ_block {
-		uint64_t md;
-		uint16_t tags[28];
+	typedef struct ququ_block {
+		uint64_t md[2];
+		uint16_t tags[56];
 	} ququ_block;
 #endif
 
