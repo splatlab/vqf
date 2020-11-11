@@ -27,6 +27,7 @@
 #define QUQU_SLOTS_PER_BLOCK 48
 #define QUQU_BUCKETS_PER_BLOCK 80
 #define QUQU_CHECK_ALT 92
+#define METADATA_SLOTS 16
 #elif TAG_BITS == 12
 #define TAG_MASK 0xfff
 #define QUQU_SLOTS_PER_BLOCK 32
@@ -37,6 +38,7 @@
 #define QUQU_SLOTS_PER_BLOCK 56
 #define QUQU_BUCKETS_PER_BLOCK 72
 #define QUQU_CHECK_ALT 86 
+#define METADATA_SLOTS 8
 #endif
 
 extern __m512i SHUFFLE [];
@@ -79,11 +81,11 @@ static inline uint64_t lookup_64(uint64_t vector, uint64_t rank) {
 static inline uint64_t lookup_128(uint64_t *vector, uint64_t rank) {
    uint64_t lower_word = vector[0];
    uint64_t lower_rank = word_rank(lower_word);
-   __uint128_t lower_return = (__uint128_t)_pdep_u64(one[rank], lower_word) >> rank << sizeof(__uint128_t);
+   __uint128_t lower_return = (__uint128_t)_pdep_u64(one[rank], lower_word) >> rank << METADATA_SLOTS;
    int64_t higher_rank = (int64_t)rank - lower_rank;
    uint64_t higher_word = vector[1];
    __uint128_t higher_return = (__uint128_t)_pdep_u64(one[higher_rank], higher_word);
-   higher_return <<= (64 + sizeof(__uint128_t) - rank);
+   higher_return <<= (64 + METADATA_SLOTS - rank);
    return lower_return + higher_return;
 }
 
@@ -170,7 +172,6 @@ static inline void shuffle_tags_512(uint16_t * restrict block, __m512i shuffle) 
 }
 
 static inline void update_tags_512(ququ_block * restrict block, uint8_t index, uint16_t tag) {
-   index -= 8;
    block->tags[55] = tag;	// add tag at the end
 
    shuffle_tags_512((uint16_t*)block + 32, SHUFFLE16_RIGHT[index]); // right block shuffle
@@ -279,6 +280,8 @@ bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
 }
 #endif
 
+uint64_t MurmurHash64A ( const void * key, int len, unsigned int seed );
+
 // If the item goes in the i'th slot (starting from 0) in the block then
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
 // by 1 bit.
@@ -294,6 +297,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t block_free = get_block_free_space(block_md);
    uint64_t tag = hash & TAG_MASK;
    uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+   //uint64_t alt_block_index = (MurmurHash64A(&hash, 64, 0x5bd1e995) % range) >> key_remainder_bits;
 
    __builtin_prefetch(&blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
 
@@ -305,6 +309,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	 block_index = alt_block_index;
 	 block_md = alt_block_md;
       } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
+         print_block(filter, block_index/QUQU_BUCKETS_PER_BLOCK);
 	 fprintf(stderr, "ququ filter is full.");
          exit(EXIT_FAILURE);
       }
@@ -313,12 +318,8 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
-   if (hash == 251467486) {
-      printf("Tag: %ld block free: %ld\n", tag, block_free);
-      print_block(filter, index);
-   }
    uint64_t slot_index = select_128(block_md, offset);
-   uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
+   uint64_t select_index = slot_index + offset - METADATA_SLOTS;
    /*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
    /*print_block(filter, index);*/
 
@@ -328,9 +329,6 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    update_tags_512(&blocks[index], slot_index,tag);
 #endif
    update_md(block_md, select_index);
-   if (hash == 251467486) {
-      print_block(filter, index);
-   }
    /*print_block(filter, index);*/
    return true;
 }
@@ -358,7 +356,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    }
 
    uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 * sizeof(uint64_t);
+	 1) : one[0] << METADATA_SLOTS;
    uint64_t end = lookup_128(filter->blocks[index].md, offset);
    uint64_t mask = end - start;
 
@@ -367,7 +365,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
       ququ_block    * restrict blocks             = filter->blocks;
       uint64_t remove_index = __builtin_ctzll(check_indexes);
       remove_tags_512(&blocks[index], remove_index);
-      remove_index = remove_index + offset - sizeof(__uint128_t);
+      remove_index = remove_index + offset - METADATA_SLOTS;
       uint64_t *block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
       remove_md(block_md, remove_index);
       return true;
@@ -417,11 +415,13 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-   __mmask64 result1 = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   __mmask64 result1 = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
    block = _mm512_loadu_si512(reinterpret_cast<__m512i*>(((uint16_t*)&filter->blocks[index] + 32)));
-   __mmask64 result2 = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   __mmask64 result2 = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
 #endif
 
+   uint64_t result = result2 << 32 | result1;
+   /*
    uint64_t p1 = 0x555555555555FFFF;
    uint64_t p2 = 0x5555555555555555;
    __uint128_t t1 = _pext_u64(result1, p1);
@@ -430,9 +430,10 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    if (result == 0) {
       return false;
    }
+   */
 
    __uint128_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-	 1) : one[0] << 2 * sizeof(uint64_t);
+	 1) : one[0] << METADATA_SLOTS;
    __uint128_t end = lookup_128(filter->blocks[index].md, offset);
    __uint128_t mask = end - start;
 
@@ -462,7 +463,8 @@ bool ququ_is_present(ququ_filter * restrict filter, uint64_t hash) {
    //__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t tag = hash & TAG_MASK;
    //uint64_t block_free     =	get_block_free_space(block_md);
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995) % range)) >> key_remainder_bits;
+   //uint64_t alt_block_index = (MurmurHash64A(&hash, 64, 0x5bd1e995) % range) >> key_remainder_bits;
 
    __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
