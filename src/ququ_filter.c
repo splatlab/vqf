@@ -323,7 +323,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 
    __builtin_prefetch(&blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
 
-   if (block_free < QUQU_CHECK_ALT) {
+//   if (block_free < QUQU_CHECK_ALT) {
 #if TAG_BITS == 8
       uint64_t *alt_block_md = blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK].md;
       uint64_t alt_block_free = get_block_free_space(alt_block_md);
@@ -339,15 +339,11 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	 fprintf(stderr, "ququ filter is full.");
          exit(EXIT_FAILURE);
       }
-   }
+ //  }
 
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
-   if (hash == 1811892519) {
-      printf("Tag: %d Block free: %d\n", tag, block_free);
-      print_block(filter, index);
-   }
 #if TAG_BITS == 8
    uint64_t slot_index = select_128(block_md, offset);
    uint64_t select_index = slot_index + offset - sizeof(__uint128_t);
@@ -364,8 +360,6 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    update_tags_512(&blocks[index], slot_index,tag);
 #endif
    update_md(block_md, select_index);
-   if (hash == 1811892519)
-      print_block(filter, index);
    /*print_block(filter, index);*/
    return true;
 }
