@@ -269,7 +269,11 @@ ququ_filter * ququ_init(uint64_t nslots) {
 
    filter->metadata.total_size_in_bytes = total_size_in_bytes;
    filter->metadata.nslots = total_blocks * QUQU_SLOTS_PER_BLOCK;
+#if TAG_BITS == 8
    filter->metadata.key_remainder_bits = 8;
+#elif TAG_BITS == 16
+   filter->metadata.key_remainder_bits = 16;
+#endif
    filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
    filter->metadata.nblocks = total_blocks;
    filter->metadata.nelts = 0;
