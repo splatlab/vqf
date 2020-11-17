@@ -45,6 +45,8 @@ extern __m512i SHUFFLE [];
 extern __m512i SHUFFLE_REMOVE [];
 extern __m512i SHUFFLE16_LEFT [];
 extern __m512i SHUFFLE16_RIGHT [];
+extern __m512i REMOVE16_LEFT [];
+extern __m512i REMOVE16_RIGHT [];
 extern __m512i SHUFFLE_REMOVE16 [];
 
 static inline int word_rank(uint64_t val) {
@@ -182,9 +184,13 @@ static inline void update_tags_512(ququ_block * restrict block, uint8_t index, u
 }
 
 static inline void remove_tags_512(ququ_block * restrict block, uint8_t index) {
-   __m512i vector = _mm512_loadu_si512(reinterpret_cast<__m512i*>(block));
-   vector = _mm512_permutexvar_epi16(SHUFFLE_REMOVE16[index], vector);
-   _mm512_storeu_si512(reinterpret_cast<__m512i*>(block), vector);
+   if (index < 32) {
+      shuffle_tags_512((uint16_t*)block, REMOVE16_LEFT[index]);
+      block->tags[23] = block->tags[24];
+      shuffle_tags_512((uint16_t*)block+32, REMOVE16_RIGHT[32]);
+   } else {
+      shuffle_tags_512((uint16_t*)block+32, REMOVE16_RIGHT[index]);
+   }
 }
 #endif
 #endif
@@ -273,6 +279,15 @@ ququ_filter * ququ_init(uint64_t nslots) {
    return filter;
 }
 
+void ququ_print_metadata(ququ_filter * restrict filter) {
+   ququ_metadata m = filter->metadata;
+   printf("Size: %ld\n", m.total_size_in_bytes);
+   printf("Num slots: %ld\n", m.nslots);
+   printf("Tag size: %ld\n", m.key_remainder_bits);
+   printf("Range: %ld\n", m.range);
+   printf("Num blocks: %ld\n", m.nblocks);
+}
+
 #if 0
 bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash) {
    bool ret;
@@ -355,6 +370,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
 	 block_index = alt_block_index;
 	 block_md = alt_block_md;
       } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
+         ququ_print_metadata(filter);
          print_block(filter, block_index/QUQU_BUCKETS_PER_BLOCK);
 	 fprintf(stderr, "ququ filter is full.");
          exit(EXIT_FAILURE);
@@ -393,7 +409,10 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-   volatile __mmask64 result = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+   __mmask64 result1 = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+   block = _mm512_loadu_si512(reinterpret_cast<__m512i*>(((uint16_t*)&filter->blocks[index] + 32)));
+   __mmask64 result2 = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+   uint64_t result = result2 << 32 | result1;
 #endif
 
    if (result == 0) {
@@ -466,17 +485,6 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    __mmask64 result2 = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
    uint64_t result = result2 << 32 | result1;
 #endif
-
-   /*
-   uint64_t p1 = 0x555555555555FFFF;
-   uint64_t p2 = 0x5555555555555555;
-   __uint128_t t1 = _pext_u64(result1, p1);
-   __uint128_t t2 = _pext_u64(result2, p2);
-   __uint128_t result = t2  << (24+16) | t1;
-   if (result == 0) {
-      return false;
-   }
-   */
 
    __uint128_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
 	 1) : one[0] << METADATA_SLOTS;

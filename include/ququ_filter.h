@@ -22,7 +22,7 @@ extern "C" {
 
 #define VALUE_BITS 0
 
-#define TAG_BITS 8
+#define TAG_BITS 16
 
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
@@ -69,6 +69,7 @@ extern "C" {
 	} ququ_filter;
 
 	ququ_filter * ququ_init(uint64_t nslots);
+        void ququ_print_metadata(ququ_filter * restrict filter);
 
 	bool ququ_insert(ququ_filter * restrict filter, uint64_t hash);
 	bool ququ_insert_tx(ququ_filter * restrict filter, uint64_t hash);
