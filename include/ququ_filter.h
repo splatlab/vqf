@@ -42,7 +42,7 @@ extern "C" {
 	// bits of metadata.
 	typedef struct __attribute__ ((__packed__)) ququ_block {
 		uint64_t md[2];
-		uint8_t tags[48]; // 32 12-bit tags
+		uint8_t tags[32]; // 32 12-bit tags
 	} ququ_block;
 #elif TAG_BITS == 16 
 	// We are using 16-bit tags.
