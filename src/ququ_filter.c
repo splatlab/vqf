@@ -150,10 +150,16 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 }
 #endif
 
-#if 0
+#if 1
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
+   index -= 16;
    memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
    block->tags[index] = tag;
+}
+
+static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
+   index -= 16;
+   memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
 }
 
 #else
@@ -359,7 +365,7 @@ bool ququ_insert(ququ_filter * restrict filter, uint64_t hash) {
    /*printf("index: %ld tag: %ld offset: %ld\n", index, tag, offset);*/
    /*print_block(filter, index);*/
 
-#if 0
+#if 1
    update_tags(&blocks[index], slot_index,	tag);
 #else
    update_tags_512(&blocks[index], slot_index,tag);
@@ -375,10 +381,19 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 #if TAG_BITS == 8
+#if 1
+   __m256i bcast = _mm256_set1_epi8(tag);
+   __m256i block = _mm256_loadu_si256(reinterpret_cast<__m256i*>(&filter->blocks[index]));
+   __mmask32 result1 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   block = _mm256_loadu_si256(reinterpret_cast<__m256i*>((uint8_t*)&filter->blocks[index]+32));
+   __mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   uint64_t result = (uint64_t)result2 << 32 | (uint64_t) result1;
+#else
    __m512i bcast = _mm512_set1_epi8(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 #elif TAG_BITS == 16
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
@@ -406,7 +421,11 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    if (check_indexes != 0) { // remove the first available tag
       ququ_block    * restrict blocks             = filter->blocks;
       uint64_t remove_index = __builtin_ctzll(check_indexes);
+#if 1
+      remove_tags(&blocks[index], remove_index);
+#else
       remove_tags_512(&blocks[index], remove_index);
+#endif
 #if TAG_BITS == 8
       remove_index = remove_index + offset - sizeof(__uint128_t);
       uint64_t *block_md = blocks[block_index / QUQU_BUCKETS_PER_BLOCK].md;
@@ -455,10 +474,19 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
 
 #if TAG_BITS == 8
+#if 1
+   __m256i bcast = _mm256_set1_epi8(tag);
+   __m256i block = _mm256_loadu_si256(reinterpret_cast<__m256i*>(&filter->blocks[index]));
+   __mmask32 result1 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   block = _mm256_loadu_si256(reinterpret_cast<__m256i*>((uint8_t*)&filter->blocks[index]+32));
+   __mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+   uint64_t result = (uint64_t)result2 << 32 | (uint64_t)result1;
+#else
    __m512i bcast = _mm512_set1_epi8(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 #elif TAG_BITS == 16
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
