@@ -82,10 +82,10 @@ int main(int argc, char **argv)
 	  RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
     //std::ofstream rand_file;
     //rand_file.open("rand_file.txt");
-    //for (uint64_t i = 0; i < nvals; i++) {
-      //vals[i] = (1 * vals[i]) % filter->metadata.range;
+    for (uint64_t i = 0; i < nvals; i++) {
+      vals[i] = (1 * vals[i]) % filter->metadata.range;
       //rand_file << vals[i] << '\n';
-    //}
+    }
     //rand_file.close();
   }
   RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
