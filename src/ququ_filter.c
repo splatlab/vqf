@@ -151,6 +151,7 @@ void print_block(ququ_filter *filter, uint64_t block_index) {
 #endif
 
 #if 1
+#if TAG_BITS == 8
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
    index -= 16;
    memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
@@ -161,6 +162,18 @@ static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
    index -= 16;
    memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
 }
+#elif TAG_BITS == 16
+static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
+   index -= 8;
+   memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
+   block->tags[index] = tag;
+}
+
+static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
+   index -= 8;
+   memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
+}
+#endif
 
 #else
 #if TAG_BITS == 8

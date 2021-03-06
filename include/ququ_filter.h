@@ -22,7 +22,7 @@ extern "C" {
 
 #define VALUE_BITS 0
 
-#define TAG_BITS 8
+#define TAG_BITS 16
 
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
