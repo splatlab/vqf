@@ -496,6 +496,8 @@ bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
 
 }
 
+#if VALUE == 0
+
 static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
       uint64_t block_index) {
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
@@ -536,6 +538,7 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    __mmask64 result = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
+#endif
 #endif
 
    if (result == 0) {
