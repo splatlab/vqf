@@ -112,7 +112,7 @@ int main(int argc, char **argv)
 		}
   }
 	gettimeofday(&end, &tzp);
-	//print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
+  print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 		}
 	}
 	gettimeofday(&end, &tzp);
-	//print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
+  print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
 	gettimeofday(&start, &tzp);
   uint64_t nfps = 0;
 	/* Lookup hashes in the ququ filter */
@@ -142,11 +142,11 @@ int main(int argc, char **argv)
 		}
 	}
 	gettimeofday(&end, &tzp);
-	//print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
-        //printf("%lu/%lu positives\n"
-         //"FP rate: 1/%f\n",
-         //nfps, nvals,
-         //1.0 * nvals / nfps);
+  print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
+        printf("%lu/%lu positives\n"
+         "FP rate: 1/%f\n",
+         nfps, nvals,
+         1.0 * nvals / nfps);
 
         //fprintf(stdout, "Checking ququ_remove\n");
 
@@ -159,7 +159,7 @@ int main(int argc, char **argv)
            //}
         }
 	gettimeofday(&end, &tzp);
-	//print_time_elapsed("Remove time", &start, &end, nvals, "remove");
+  print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
 	//* Generate random values */
