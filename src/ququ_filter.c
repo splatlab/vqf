@@ -412,6 +412,18 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 #endif
 #elif TAG_BITS == 16
+#if 1
+   __m256i bcast = _mm256_set1_epi16(tag);
+   __m256i block = _mm256_loadu_si256(reinterpret_cast<__m256i*>(&filter->blocks[index]));
+   __m256i result1t = _mm256_cmpeq_epi16(bcast, block);
+   __mmask32 result1 = _mm256_movemask_epi16(result1t);
+   /*__mmask32 result1 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
+   block = _mm256_loadu_si256(reinterpret_cast<__m256i*>((uint8_t*)&filter->blocks[index]+32));
+   __m256i result2t = _mm256_cmpeq_epi16(bcast, block);
+   __mmask32 result2 = _mm256_movemask_epi16(result2t);
+   /*__mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
+   uint64_t result = (uint64_t)result2 << 32 | (uint64_t)result1;
+#else
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
@@ -509,6 +521,18 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
    __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
 #endif
 #elif TAG_BITS == 16
+#if 1
+   __m256i bcast = _mm256_set1_epi16(tag);
+   __m256i block = _mm256_loadu_si256(reinterpret_cast<__m256i*>(&filter->blocks[index]));
+   __m256i result1t = _mm256_cmpeq_epi16(bcast, block);
+   __mmask32 result1 = _mm256_movemask_epi16(result1t);
+   /*__mmask32 result1 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
+   block = _mm256_loadu_si256(reinterpret_cast<__m256i*>((uint8_t*)&filter->blocks[index]+32));
+   __m256i result2t = _mm256_cmpeq_epi16(bcast, block);
+   __mmask32 result2 = _mm256_movemask_epi16(result2t);
+   /*__mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
+   uint64_t result = (uint64_t)result2 << 32 | (uint64_t)result1;
+#else
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
