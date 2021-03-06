@@ -429,6 +429,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
       _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
    volatile __mmask64 result = _mm512_cmp_epi16_mask(bcast, block, _MM_CMPINT_EQ);
 #endif
+#endif
 
    if (result == 0) {
       // no matching tags, can bail
@@ -494,8 +495,6 @@ bool ququ_remove(ququ_filter * restrict filter, uint64_t hash) {
    return remove_tags(filter, tag, block_index) || remove_tags(filter, tag, alt_block_index);
 
 }
-
-#if VALUE_BITS == 0
 
 static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
       uint64_t block_index) {
