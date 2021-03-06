@@ -164,13 +164,13 @@ static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
 }
 #elif TAG_BITS == 16
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
-   index -= 8;
+   index -= 4;
    memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
    block->tags[index] = tag;
 }
 
 static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
-   index -= 8;
+   index -= 4;
    memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
 }
 #endif
