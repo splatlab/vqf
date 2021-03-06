@@ -89,17 +89,7 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-#if VALUE_BITS == 0
-		if (!ququ_is_present(filter, vals[i])) {
-#else
-                uint8_t value;
-		if (!ququ_is_present(filter, vals[i], &value)) {
-#endif
-			fprintf(stderr, "Lookup failed for %ld", vals[i]);
-			exit(EXIT_FAILURE);
-		}
-
-         }
+  }
 	gettimeofday(&end, &tzp);
 	//print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
