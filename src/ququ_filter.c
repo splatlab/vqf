@@ -165,13 +165,13 @@ static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
 #elif TAG_BITS == 16
 static inline void update_tags(ququ_block * restrict block, uint8_t index, uint16_t tag) {
    index -= 4;
-   memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
+   memmove(&block->tags[index + 1], &block->tags[index], (sizeof(block->tags) / sizeof(block->tags[0]) - index - 1) * 2);
    block->tags[index] = tag;
 }
 
 static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
    index -= 4;
-   memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
+   memmove(&block->tags[index], &block->tags[index+1], (sizeof(block->tags) / sizeof(block->tags[0]) - index) * 2);
 }
 #endif
 
@@ -425,7 +425,7 @@ static inline bool remove_tags(ququ_filter * restrict filter, uint64_t tag,
    __mmask32 result2 = _mm256_movemask_epi8(result2t);
    result2 = _pext_u32(result2, alt_mask);
    /*__mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
-   uint64_t result = (uint64_t)result2 << 32 | (uint64_t)result1;
+   uint64_t result = (uint64_t)result2 << 16 | (uint64_t)result1;
 #else
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =

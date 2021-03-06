@@ -10,6 +10,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
@@ -66,13 +67,33 @@ int main(int argc, char **argv)
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
-	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
-	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
-	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
-		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
-	}
+  other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
+  if (argc > 2) {
+    std::ifstream rand_file;
+    rand_file.open("rand_file.txt");
+    uint64_t item;
+    uint64_t i = 0;
+    while (rand_file >> item) {
+      vals[i] = item;
+      i++;
+    }
+    rand_file.close();
+    } else{
+	  RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+    std::ofstream rand_file;
+    rand_file.open("rand_file.txt");
+    for (uint64_t i = 0; i < nvals; i++) {
+      vals[i] = (1 * vals[i]) % filter->metadata.range;
+      rand_file << vals[i] << '\n';
+    }
+    rand_file.close();
+  }
+  RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
+  for (uint64_t i = 0; i < nvals; i++) {
+    other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+  }
+
+
 /*
         srand(0);
         for (uint32_t i = 0; i < nvals; i++) {
@@ -89,6 +110,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
+#if VALUE_BITS == 0
+		if (!ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (!ququ_is_present(filter, vals[i], &value)) {
+#endif
+			fprintf(stderr, "Lookup failed for %ld", vals[i]);
+			exit(EXIT_FAILURE);
+		}
+
   }
 	gettimeofday(&end, &tzp);
 	//print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
