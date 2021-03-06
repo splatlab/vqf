@@ -39,10 +39,10 @@
 #define QUQU_CHECK_ALT 43 
 #endif
 
-extern __m512i SHUFFLE [];
-extern __m512i SHUFFLE_REMOVE [];
-extern __m512i SHUFFLE16 [];
-extern __m512i SHUFFLE_REMOVE16 [];
+/*extern __m512i SHUFFLE [];*/
+/*extern __m512i SHUFFLE_REMOVE [];*/
+/*extern __m512i SHUFFLE16 [];*/
+/*extern __m512i SHUFFLE_REMOVE16 [];*/
 
 static inline int word_rank(uint64_t val) {
    return __builtin_popcountll(val);
@@ -163,7 +163,7 @@ static inline void remove_tags(ququ_block * restrict block, uint8_t index) {
    memmove(&block->tags[index], &block->tags[index+1], sizeof(block->tags) / sizeof(block->tags[0]) - index);
 }
 #elif TAG_BITS == 16
-static inline void update_tags(ququ_block * restrict block, uint8_t index, uint8_t tag) {
+static inline void update_tags(ququ_block * restrict block, uint8_t index, uint16_t tag) {
    index -= 4;
    memmove(&block->tags[index + 1], &block->tags[index], sizeof(block->tags) / sizeof(block->tags[0]) - index - 1);
    block->tags[index] = tag;

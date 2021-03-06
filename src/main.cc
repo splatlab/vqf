@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 	}
 	uint64_t qbits = atoi(argv[1]);
 	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 90*nslots/100;
+	uint64_t nvals = 85*nslots/100;
 	uint64_t *vals;
 	uint64_t *other_vals;
 
@@ -89,9 +89,19 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
+#if VALUE_BITS == 0
+		if (!ququ_is_present(filter, vals[i])) {
+#else
+                uint8_t value;
+		if (!ququ_is_present(filter, vals[i], &value)) {
+#endif
+			fprintf(stderr, "Lookup failed for %ld", vals[i]);
+			exit(EXIT_FAILURE);
+		}
+
          }
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
+	//print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
@@ -106,7 +116,7 @@ int main(int argc, char **argv)
 		}
 	}
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
+	//print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
 	gettimeofday(&start, &tzp);
   uint64_t nfps = 0;
 	/* Lookup hashes in the ququ filter */
@@ -121,11 +131,11 @@ int main(int argc, char **argv)
 		}
 	}
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
-        printf("%lu/%lu positives\n"
-         "FP rate: 1/%f\n",
-         nfps, nvals,
-         1.0 * nvals / nfps);
+	//print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
+        //printf("%lu/%lu positives\n"
+         //"FP rate: 1/%f\n",
+         //nfps, nvals,
+         //1.0 * nvals / nfps);
 
         //fprintf(stdout, "Checking ququ_remove\n");
 
@@ -138,7 +148,7 @@ int main(int argc, char **argv)
            //}
         }
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Remove time", &start, &end, nvals, "remove");
+	//print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
 	//* Generate random values */
