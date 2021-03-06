@@ -523,16 +523,19 @@ static inline bool check_tags(ququ_filter * restrict filter, uint64_t tag,
 #endif
 #elif TAG_BITS == 16
 #if 1
+   uint64_t alt_mask = 0x55555555;
    __m256i bcast = _mm256_set1_epi16(tag);
    __m256i block = _mm256_loadu_si256(reinterpret_cast<__m256i*>(&filter->blocks[index]));
    __m256i result1t = _mm256_cmpeq_epi16(bcast, block);
    __mmask32 result1 = _mm256_movemask_epi8(result1t);
+   result1 = _pext_u32(result1, alt_mask);
    /*__mmask32 result1 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
    block = _mm256_loadu_si256(reinterpret_cast<__m256i*>((uint8_t*)&filter->blocks[index]+32));
    __m256i result2t = _mm256_cmpeq_epi16(bcast, block);
    __mmask32 result2 = _mm256_movemask_epi8(result2t);
+   result2 = _pext_u64(result2, alt_mask);
    /*__mmask32 result2 = _mm256_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);*/
-   uint64_t result = (uint64_t)result2 << 32 | (uint64_t)result1;
+   uint64_t result = (uint64_t)result2 << 16 | (uint64_t)result1;
 #else
    __m512i bcast = _mm512_set1_epi16(tag);
    __m512i block =
