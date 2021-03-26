@@ -17,7 +17,7 @@
 #include <pthread.h>
 #include <openssl/rand.h>
 
-#include "ququ_filter.h"
+#include "vqf_filter.h"
 
 uint64_t tv2usec(struct timeval *tv) {
   return 1000000 * tv->tv_sec + tv->tv_usec;
@@ -37,7 +37,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 
 typedef struct args {
-	ququ_filter *cf;
+	vqf_filter *cf;
 	uint64_t *vals;
 	uint64_t start;
 	uint64_t end;
@@ -47,7 +47,7 @@ void *insert_bm(void *arg)
 {
    args *a = (args *)arg;
    for (uint32_t i = a->start; i <= a->end; i++) {
-      int ret = ququ_insert(a->cf, a->vals[i]);
+      int ret = vqf_insert(a->cf, a->vals[i]);
       if (ret < 0) {
          fprintf(stderr, "failed insertion for key: %lx.\n", a->vals[i]);
          abort();
@@ -60,7 +60,7 @@ void *query_bm(void *arg)
 {
    args *a = (args *)arg;
    for (uint32_t i = a->start; i <= a->end; i++) {
-      int ret = ququ_is_present(a->cf, a->vals[i]);
+      int ret = vqf_is_present(a->cf, a->vals[i]);
       if (ret < 0) {
          fprintf(stderr, "failed insertion for key: %lx.\n", a->vals[i]);
          abort();
@@ -104,11 +104,11 @@ int main(int argc, char **argv)
 	uint64_t nvals = 900*nslots/1000;
 
 	uint64_t *vals;
-        ququ_filter *filter;	
+        vqf_filter *filter;	
 
-	/* initialize ququ filter */
-	if ((filter = ququ_init(nslots)) == NULL) {
-		fprintf(stderr, "Can't allocate ququ filter.");
+	/* initialize vqf filter */
+	if ((filter = vqf_init(nslots)) == NULL) {
+		fprintf(stderr, "Can't allocate vqf filter.");
 		exit(EXIT_FAILURE);
 	}
 
@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 	//fprintf(stdout, "Inserted all items: %ld\n", arg[tcnt-1].end);
 
 	for (uint64_t i = 0; i < arg[tcnt-1].end; i++) {
-           if (!ququ_is_present(filter, vals[i])) {
+           if (!vqf_is_present(filter, vals[i])) {
               fprintf(stderr, "Lookup failed for %ld", vals[i]);
               exit(EXIT_FAILURE);
            }

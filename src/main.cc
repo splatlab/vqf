@@ -10,6 +10,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
@@ -20,7 +21,7 @@
 
 #include <set>
 
-#include "ququ_filter.h"
+#include "vqf_filter.h"
 
 extern __m512i SHUFFLE [];
 extern __m512i SHUFFLE_REMOVE [];
@@ -45,6 +46,7 @@ void print_time_elapsed(const char* desc, struct timeval* start, struct
 
 int main(int argc, char **argv)
 {
+
 #if 1
 	if (argc < 2) {
 		fprintf(stderr, "Please specify the log of the number of slots in the CQF.\n");
@@ -52,27 +54,47 @@ int main(int argc, char **argv)
 	}
 	uint64_t qbits = atoi(argv[1]);
 	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 90*nslots/100;
+	uint64_t nvals = 85*nslots/100;
 	uint64_t *vals;
 	uint64_t *other_vals;
 
-	ququ_filter *filter;	
+	vqf_filter *filter;	
 
-	/* initialize ququ filter */
-	if ((filter = ququ_init(nslots)) == NULL) {
-		fprintf(stderr, "Can't allocate ququ filter.");
+	/* initialize vqf filter */
+	if ((filter = vqf_init(nslots)) == NULL) {
+		fprintf(stderr, "Can't allocate vqf filter.");
 		exit(EXIT_FAILURE);
 	}
 
 	/* Generate random values */
 	vals = (uint64_t*)malloc(nvals*sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
-	other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
-	RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
-	for (uint64_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
-		other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
-	}
+  other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
+  if (argc > 2) {
+    std::ifstream rand_file;
+    rand_file.open("rand_file.txt");
+    uint64_t item;
+    uint64_t i = 0;
+    while (rand_file >> item) {
+      vals[i] = item;
+      i++;
+    }
+    rand_file.close();
+    } else{
+	  RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+    //std::ofstream rand_file;
+    //rand_file.open("rand_file.txt");
+    for (uint64_t i = 0; i < nvals; i++) {
+      vals[i] = (1 * vals[i]) % filter->metadata.range;
+      //rand_file << vals[i] << '\n';
+    }
+    //rand_file.close();
+  }
+  RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
+  for (uint64_t i = 0; i < nvals; i++) {
+    other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+  }
+
+
 /*
         srand(0);
         for (uint32_t i = 0; i < nvals; i++) {
@@ -83,62 +105,62 @@ int main(int argc, char **argv)
 	struct timezone tzp;
 
 	gettimeofday(&start, &tzp);
-	/* Insert hashes in the ququ filter */
+	/* Insert hashes in the vqf filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_insert(filter, vals[i])) {
+		if (!vqf_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
-         }
+  }
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
+  print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 //	puts("");
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
 #if VALUE_BITS == 0
-		if (!ququ_is_present(filter, vals[i])) {
+		if (!vqf_is_present(filter, vals[i])) {
 #else
                 uint8_t value;
-		if (!ququ_is_present(filter, vals[i], &value)) {
+		if (!vqf_is_present(filter, vals[i], &value)) {
 #endif
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}
 	}
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
+  print_time_elapsed("Lookup time", &start, &end, nvals, "successful lookup");
 	gettimeofday(&start, &tzp);
   uint64_t nfps = 0;
-	/* Lookup hashes in the ququ filter */
+	/* Lookup hashes in the vqf filter */
 	for (uint64_t i = 0; i < nvals; i++) {
 #if VALUE_BITS == 0
-		if (ququ_is_present(filter, other_vals[i])) {
+		if (vqf_is_present(filter, other_vals[i])) {
 #else
                 uint8_t value;
-		if (ququ_is_present(filter, other_vals[i], &value)) {
+		if (vqf_is_present(filter, other_vals[i], &value)) {
 #endif
       nfps++;
 		}
 	}
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
+  print_time_elapsed("Random lookup:", &start, &end, nvals, "random lookup");
         printf("%lu/%lu positives\n"
          "FP rate: 1/%f\n",
          nfps, nvals,
          1.0 * nvals / nfps);
 
-        //fprintf(stdout, "Checking ququ_remove\n");
+        //fprintf(stdout, "Checking vqf_remove\n");
 
 	gettimeofday(&start, &tzp);
 	for (uint64_t i = 0; i < nvals; i++) {
-           ququ_remove(filter, vals[i]);
-           //if (ququ_is_present(filter, vals[i])) {
+           vqf_remove(filter, vals[i]);
+           //if (vqf_is_present(filter, vals[i])) {
            //   fprintf(stderr, "Lookup true after deletion for %ld", vals[i]);
            //   exit(EXIT_FAILURE);
            //}
         }
 	gettimeofday(&end, &tzp);
-	print_time_elapsed("Remove time", &start, &end, nvals, "remove");
+  print_time_elapsed("Remove time", &start, &end, nvals, "remove");
 
 #if 0
 	//* Generate random values */
@@ -162,9 +184,9 @@ int main(int argc, char **argv)
 	struct timezone tzp;
 
 	gettimeofday(&start, &tzp);
-	/* Insert hashes in the ququ filter */
+	/* Insert hashes in the vqf filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_insert(filter, vals[i])) {
+		if (!vqf_insert(filter, vals[i])) {
 			fprintf(stderr, "Insertion failed");
 			exit(EXIT_FAILURE);
 		}
@@ -173,9 +195,9 @@ int main(int argc, char **argv)
 	print_time_elapsed("Insertion:", &start, &end);
 	puts("");
 	gettimeofday(&start, &tzp);
-	/* Lookup hashes in the ququ filter */
+	/* Lookup hashes in the vqf filter */
 	for (uint64_t i = 0; i < nvals; i++) {
-		if (!ququ_is_present(filter, vals[i])) {
+		if (!vqf_is_present(filter, vals[i])) {
 			fprintf(stderr, "Lookup failed for %ld", vals[i]);
 			exit(EXIT_FAILURE);
 		}

@@ -1,7 +1,7 @@
 /*
  * ============================================================================
  *
- *       Filename:  ququ_precompute.h
+ *       Filename:  vqf_precompute.h
  *
  *         Author:  Prashant Pandey (), ppandey@berkeley.edu
  *   Organization:  LBNL/UCB

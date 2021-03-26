@@ -27,7 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "ququ_wrapper.h"
+#include "vqf_wrapper.h"
 
 typedef void *(*rand_init)(uint64_t maxoutputs, __uint128_t maxvalue,
                            void *params);

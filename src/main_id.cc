@@ -20,7 +20,7 @@
 
 #include <set>
 
-#include "ququ_filter.h"
+#include "vqf_filter.h"
 
 #define ITR 100000000 
 
@@ -52,11 +52,11 @@ int main(int argc, char **argv)
    uint64_t *vals;
    uint64_t *other_vals;
 
-   ququ_filter *filter;	
+   vqf_filter *filter;	
 
-   /* initialize ququ filter */
-   if ((filter = ququ_init(nslots)) == NULL) {
-      fprintf(stderr, "Can't allocate ququ filter.");
+   /* initialize vqf filter */
+   if ((filter = vqf_init(nslots)) == NULL) {
+      fprintf(stderr, "Can't allocate vqf filter.");
       exit(EXIT_FAILURE);
    }
 
@@ -79,9 +79,9 @@ int main(int argc, char **argv)
    struct timezone tzp;
 
    gettimeofday(&start, &tzp);
-   /* Insert hashes in the ququ filter */
+   /* Insert hashes in the vqf filter */
    for (uint64_t i = 0; i < nvals; i++) {
-      if (!ququ_insert(filter, vals[i])) {
+      if (!vqf_insert(filter, vals[i])) {
          fprintf(stderr, "Insertion failed");
          exit(EXIT_FAILURE);
       }
@@ -108,11 +108,11 @@ int main(int argc, char **argv)
    gettimeofday(&start, &tzp);
    for (uint64_t i = 0; i < ITR; i++) {
       if (oprs[i] == 0) { // delete
-         ret = ququ_remove(filter, opr_vals[i]);
+         ret = vqf_remove(filter, opr_vals[i]);
       } else if (oprs[i] == 1) { // query
-         ret = ququ_is_present(filter, opr_vals[i]);
+         ret = vqf_is_present(filter, opr_vals[i]);
       } else if (oprs[i] == 2) { // insert
-         if (!ququ_insert(filter, opr_vals[i])) {
+         if (!vqf_insert(filter, opr_vals[i])) {
             fprintf(stderr, "Insertion failed");
             exit(EXIT_FAILURE);
          }
