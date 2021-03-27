@@ -20,9 +20,7 @@
 extern "C" {
 #endif
 
-#define VALUE_BITS 0
-
-#define TAG_BITS 8
+#define TAG_BITS 16
 
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
@@ -40,6 +38,7 @@ extern "C" {
 	// We are using 12-bit tags.
 	// One block consists of 32 12-bit slots covering 96 buckets, and 96+32 = 128
 	// bits of metadata.
+        // NOTE: not supported yet.
 	typedef struct __attribute__ ((__packed__)) vqf_block {
 		uint64_t md[2];
 		uint8_t tags[32]; // 32 12-bit tags
@@ -71,23 +70,10 @@ extern "C" {
 	vqf_filter * vqf_init(uint64_t nslots);
 
 	bool vqf_insert(vqf_filter * restrict filter, uint64_t hash);
-	bool vqf_insert_tx(vqf_filter * restrict filter, uint64_t hash);
 	
 	bool vqf_remove(vqf_filter * restrict filter, uint64_t hash);
-	bool vqf_remove_tx(vqf_filter * restrict filter, uint64_t hash);
 
-#if VALUE_BITS == 0
 	bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash);
-	bool vqf_is_present_tx(vqf_filter * restrict filter, uint64_t hash);
-#else
-        bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash,
-              uint8_t *value);
-        bool vqf_is_present_tx(vqf_filter * restrict filter, uint64_t hash,
-              uint8_t *value);
-
-	bool vqf_set(vqf_filter * restrict filter, uint64_t hash, uint8_t value);
-	bool vqf_set_tx(vqf_filter * restrict filter, uint64_t hash, uint8_t value);
-#endif
 
 #ifdef __cplusplus
 }

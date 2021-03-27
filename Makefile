@@ -5,8 +5,13 @@ OPT=-Ofast -g
 
 ARCH=-msse4.2
 
-ifdef P
-	PROFILE=-pg -no-pie # for bug in gprof.
+ifeq ($(P),1)
+   OPT=-g -no-pie
+endif
+
+
+ifeq ($(THREAD),1)
+   OPT +=-DENABLE_THREADS
 endif
 
 CXX = g++ -std=c++11 -fgnu-tm -mavx512bw -mavx512f -frename-registers  -march=native
@@ -32,6 +37,7 @@ all: $(TARGETS)
 # dependencies between programs and .o files
 main:							$(OBJDIR)/main.o $(OBJDIR)/vqf_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o 
 main_id:						$(OBJDIR)/main_id.o $(OBJDIR)/vqf_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o 
+main_tx:						$(OBJDIR)/main_tx.o $(OBJDIR)/vqf_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o 
 bm:							$(OBJDIR)/bm.o $(OBJDIR)/vqf_filter.o $(OBJDIR)/shuffle_matrix_512.o $(OBJDIR)/shuffle_matrix_512_16.o 
 
 # dependencies between .o files and .cc (or .c) files
@@ -39,6 +45,7 @@ $(OBJDIR)/shuffle_matrix_512_16.o: 	$(LOC_SRC)/shuffle_matrix_512_16.c
 $(OBJDIR)/shuffle_matrix_512.o: 	$(LOC_SRC)/shuffle_matrix_512.c
 $(OBJDIR)/main.o: 			$(LOC_SRC)/main.cc
 $(OBJDIR)/main_id.o: 			$(LOC_SRC)/main_id.cc
+$(OBJDIR)/main_tx.o: 			$(LOC_SRC)/main_tx.cc
 $(OBJDIR)/bm.o: 			$(LOC_SRC)/bm.cc
 
 $(OBJDIR)/vqf_filter.o: 			$(LOC_SRC)/vqf_filter.c
