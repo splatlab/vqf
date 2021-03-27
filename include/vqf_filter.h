@@ -20,7 +20,8 @@
 extern "C" {
 #endif
 
-#define TAG_BITS 16
+   // NOTE: Currently the code only works for TAG_BITS 8 and 16.
+#define TAG_BITS 8
 
 	// metadata: 1 --> end of the run
 	// Each 1 is preceded by k 0s, where k is the number of remainders in that
