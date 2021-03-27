@@ -42,6 +42,12 @@ an alternate implementation based on AVX2.
  $ ./main 24
 ```
 
+To build the code with thread-safe insertions:
+```bash
+ $ make THREAD=1 main_tx
+ $ ./main_tx 24 4
+```
+
  The argument to main is the log of the number of slots in the VQF. For example,
  to create a VQF with 2^30 slots, the argument will be 30.
 
