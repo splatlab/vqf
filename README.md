@@ -11,6 +11,7 @@ This work appeared at SIGMOD 2021. If you use this software please cite us:
                Martin Farach-Colton and
                Rob Johnson},
   title     = {Vector Quotient Filters: Overcoming the Time/Space Trade-Off in Filter Design},
+  booktitle={Proceedings of the 2021 ACM international conference on Management of Data},
   year      = {2021},
 }
 ```
