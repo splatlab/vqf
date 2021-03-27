@@ -46,6 +46,59 @@ extern __m512i SHUFFLE16 [];
 extern __m512i SHUFFLE_REMOVE16 [];
 #endif
 
+#define LOCK_MASK (1ULL << 63)
+#define UNLOCK_MASK ~(1ULL << 63)
+
+static inline void lock(vqf_block& block)
+{
+#ifdef ENABLE_THREADS
+   uint64_t *data;
+#if TAG_BITS == 8
+   data = block.md + 1;
+#elif TAG_BITS == 16
+   data = &block.md;
+#endif
+   while ((__sync_fetch_and_or(data, LOCK_MASK) & (1ULL << 63)) != 0) {}
+#endif
+}
+
+static inline void unlock(vqf_block& block)
+{
+#ifdef ENABLE_THREADS
+   uint64_t *data;
+#if TAG_BITS == 8
+   data = block.md + 1;
+#elif TAG_BITS == 16
+   data = &block.md;
+#endif
+   __sync_fetch_and_and(data, UNLOCK_MASK);
+#endif
+}
+
+static inline void lock_blocks(vqf_filter * restrict filter, uint64_t index1, uint64_t index2)  {
+#ifdef ENABLE_THREADS
+   if (index1 < index2) {
+      lock(filter->blocks[index1/QUQU_BUCKETS_PER_BLOCK]);
+      lock(filter->blocks[index2/QUQU_BUCKETS_PER_BLOCK]);
+   } else {
+      lock(filter->blocks[index2/QUQU_BUCKETS_PER_BLOCK]);
+      lock(filter->blocks[index1/QUQU_BUCKETS_PER_BLOCK]);
+   }
+#endif
+}
+
+static inline void unlock_blocks(vqf_filter * restrict filter, uint64_t index1, uint64_t index2)  {
+#ifdef ENABLE_THREADS
+   if (index1 < index2) {
+      unlock(filter->blocks[index1/QUQU_BUCKETS_PER_BLOCK]);
+      unlock(filter->blocks[index2/QUQU_BUCKETS_PER_BLOCK]);
+   } else {
+      unlock(filter->blocks[index2/QUQU_BUCKETS_PER_BLOCK]);
+      unlock(filter->blocks[index1/QUQU_BUCKETS_PER_BLOCK]);
+   }
+#endif
+}
+
 static inline int word_rank(uint64_t val) {
    return __builtin_popcountll(val);
 }
@@ -277,7 +330,6 @@ static inline uint64_t get_block_free_space(uint64_t vector) {
 // log(n) is 51 given a cache line size.
 // n/51 blocks.
 vqf_filter * vqf_init(uint64_t nslots) {
-   assert(VALUE_BITS <= 2);
    vqf_filter *filter;
 
    uint64_t total_blocks = (nslots + QUQU_SLOTS_PER_BLOCK)/QUQU_SLOTS_PER_BLOCK;
@@ -303,26 +355,18 @@ vqf_filter * vqf_init(uint64_t nslots) {
    for (uint64_t i = 0; i < total_blocks; i++) {
       filter->blocks[i].md[0] = UINT64_MAX;
       filter->blocks[i].md[1] = UINT64_MAX;
+      // reset the most significant bit of metadata for locking.
+      filter->blocks[i].md[1] = filter->blocks[i].md[1] & ~(1ULL << 63);
    }
 #elif TAG_BITS == 16
    for (uint64_t i = 0; i < total_blocks; i++) {
       filter->blocks[i].md = UINT64_MAX;
+      filter->blocks[i].md = filter->blocks[i].md & ~(1ULL << 63);
    }
 #endif
 
    return filter;
 }
-
-#if 0
-bool vqf_insert_tx(vqf_filter * restrict filter, uint64_t hash) {
-   bool ret;
-   unsigned status = _XABORT_EXPLICIT;
-   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ret = vqf_insert(filter, hash);
-   _xend();
-   return ret;
-}
-#endif
 
 // If the item goes in the i'th slot (starting from 0) in the block then
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
@@ -335,6 +379,7 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t                 range              = metadata->range;
 
    uint64_t block_index = hash >> key_remainder_bits;
+   lock(blocks[block_index/QUQU_BUCKETS_PER_BLOCK]);
 #if TAG_BITS == 8
    uint64_t *block_md = blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t block_free = get_block_free_space(block_md);
@@ -347,7 +392,9 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
 
    __builtin_prefetch(&blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
 
-   if (block_free < QUQU_CHECK_ALT) {
+   if (block_free < QUQU_CHECK_ALT && block_index/QUQU_BUCKETS_PER_BLOCK != alt_block_index/QUQU_BUCKETS_PER_BLOCK) {
+      unlock(blocks[block_index/QUQU_BUCKETS_PER_BLOCK]);
+      lock_blocks(filter, block_index, alt_block_index);
 #if TAG_BITS == 8
       uint64_t *alt_block_md = blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK].md;
       uint64_t alt_block_free = get_block_free_space(alt_block_md);
@@ -357,13 +404,18 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
 #endif
       // pick the least loaded block
       if (alt_block_free > block_free) {
+         unlock(blocks[block_index/QUQU_BUCKETS_PER_BLOCK]);
          block_index = alt_block_index;
          block_md = alt_block_md;
       } else if (block_free == QUQU_BUCKETS_PER_BLOCK) {
+         unlock_blocks(filter, block_index, alt_block_index);
          fprintf(stderr, "vqf filter is full.");
          return false;
          //exit(EXIT_FAILURE);
+      } else {
+         unlock(blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
       }
+
    }
 
    uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
@@ -382,6 +434,7 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
    update_tags_512(&blocks[index], slot_index,tag);
    update_md(block_md, select_index);
    /*print_block(filter, index);*/
+   unlock(blocks[block_index/QUQU_BUCKETS_PER_BLOCK]);
    return true;
 }
 
@@ -466,17 +519,6 @@ static inline bool remove_tags(vqf_filter * restrict filter, uint64_t tag,
       return false;
 }
 
-#if 0
-bool vqf_remove_tx(vqf_filter * restrict filter, uint64_t hash) {
-   bool ret;
-   unsigned status = _XABORT_EXPLICIT;
-   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ret = vqf_remove(filter, hash);
-   _xend();
-   return ret;
-}
-#endif
-
 bool vqf_remove(vqf_filter * restrict filter, uint64_t hash) {
    vqf_metadata * restrict metadata           = &filter->metadata;
    uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
@@ -490,8 +532,6 @@ bool vqf_remove(vqf_filter * restrict filter, uint64_t hash) {
 
    return remove_tags(filter, tag, block_index) || remove_tags(filter, tag, alt_block_index);
 }
-
-#if VALUE == 0
 
 static inline bool check_tags(vqf_filter * restrict filter, uint64_t tag,
       uint64_t block_index) {
@@ -557,17 +597,6 @@ static inline bool check_tags(vqf_filter * restrict filter, uint64_t tag,
    return (mask & result) != 0;
 }
 
-#if 0
-bool vqf_is_present_tx(vqf_filter * restrict filter, uint64_t hash) {
-   bool ret;
-   unsigned status = _XABORT_EXPLICIT;
-   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   ret = vqf_is_present(filter, hash);
-   _xend();
-   return ret;
-}
-#endif
-
 // If the item goes in the i'th slot (starting from 0) in the block then
 // select(i) - i is the slot index for the end of the run.
 bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash) {
@@ -577,18 +606,12 @@ bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t                 range              = metadata->range;
 
    uint64_t block_index = hash >> key_remainder_bits;
-   //__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t tag = hash & TAG_MASK;
-   //uint64_t block_free     =	get_block_free_space(block_md);
    uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
 
    __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
-   //if (block_free < QUQU_CHECK_ALT) {
    return check_tags(filter, tag, block_index) || check_tags(filter, tag, alt_block_index);
-   // } else {
-   //    return check_tags(filter, tag, block_index); 
-   //}
 
    /*if (!ret) {*/
    /*printf("tag: %ld offset: %ld\n", tag, block_index % QUQU_SLOTS_PER_BLOCK);*/
@@ -597,167 +620,3 @@ bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash) {
    /*}*/
 }
 
-#else
-
-#define VALUE00 0x0
-#define VALUE01 0x1
-#define VALUE10 0x2
-#define VALUE11 0x3
-
-static inline bool check_tags(vqf_filter * restrict filter, uint8_t tag,
-      uint64_t block_index, uint8_t *value) {
-   uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
-   uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
-
-
-   // The broadcast tag should take care of all different possible values.
-   // We bitwise OR the results of all possible cmp instructions.
-   __m512i block =
-      _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-#if VALUE_BITS == 1
-   uint8_t tag_val = tag | VALUE00;
-   __m512i bcast = _mm512_set1_epi8(tag_val);
-   volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-   tag_val = tag | VALUE01;
-   bcast = _mm512_set1_epi8(tag_val);
-   result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-#elif VALUE_BITS == 2
-   uint8_t tag_val0 = tag | VALUE00;
-   __m512i bcast = _mm512_set1_epi8(tag_val);
-   volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-   tag_val = tag | VALUE01;
-   bcast = _mm512_set1_epi8(tag_val);
-   result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-   tag_val = tag | VALUE10;
-   bcast = _mm512_set1_epi8(tag_val);
-   result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-   tag_val = tag | VALUE11;
-   bcast = _mm512_set1_epi8(tag_val);
-   result = result | _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-#endif
-
-   if (result == 0) {
-      // no matching tags, can bail
-      return false;
-   }
-
-   uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-         1) : one[0] << 2 *
-      sizeof(uint64_t);
-   uint64_t end = lookup_128(filter->blocks[index].md, offset);
-   uint64_t mask = end - start;
-   uint64_t check_indexes = mask & result;
-
-   // TODO: need to optimize this using AVX512 instructions        
-   if (check_indexes != 0) { // accumulate values
-      uint64_t value_mask = (1ULL << VALUE_BITS) - 1;
-      while (check_indexes) {
-         uint8_t bit_index = __builtin_ctzll(check_indexes);
-         *value = *value | (1 << filter->blocks[index].tags[bit_index +
-               sizeof(__uint128_t)] & value_mask);
-         check_indexes = check_indexes >> bit_index; 
-      }
-      return true;
-   } else
-      return false;
-}
-
-bool vqf_is_present_tx(vqf_filter * restrict filter, uint64_t hash, uint8_t
-      *value) {
-   unsigned status = _XABORT_EXPLICIT;
-   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   vqf_is_present_tx(filter, hash, value);
-   _xend();
-}
-
-// If the item goes in the i'th slot (starting from 0) in the block then
-// select(i) - i is the slot index for the end of the run.
-bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash, uint8_t
-      *value) {
-   vqf_metadata * restrict metadata           = &filter->metadata;
-   //vqf_block    * restrict blocks             = filter->blocks;
-   uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
-   uint64_t                 range              = metadata->range;
-
-   uint64_t block_index = hash >> key_remainder_bits;
-   //__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
-   uint64_t tag = hash & 0xff;
-   //uint64_t block_free     =	get_block_free_space(block_md);
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-
-   __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
-
-   //if (block_free < QUQU_CHECK_ALT) {
-   return check_tags(filter, tag, block_index, value) || check_tags(filter,
-         tag,
-         alt_block_index,
-         value);
-   // } else {
-   //    return check_tags(filter, tag, block_index); 
-   //}
-}
-
-static inline bool set_tags(vqf_filter * restrict filter, uint8_t tag,
-      uint64_t block_index, uint8_t value) {
-   uint64_t index = block_index / QUQU_BUCKETS_PER_BLOCK;
-   uint64_t offset = block_index % QUQU_BUCKETS_PER_BLOCK;
-
-   __m512i bcast = _mm512_set1_epi8(tag);
-   __m512i block =
-      _mm512_loadu_si512(reinterpret_cast<__m512i*>(&filter->blocks[index]));
-   volatile __mmask64 result = _mm512_cmp_epi8_mask(bcast, block, _MM_CMPINT_EQ);
-
-   if (result == 0) {
-      // no matching tags, can bail
-      return false;
-   }
-
-   uint64_t start = offset != 0 ? lookup_128(filter->blocks[index].md, offset -
-         1) : one[0] << 2 *
-      sizeof(uint64_t);
-   uint64_t end = lookup_128(filter->blocks[index].md, offset);
-   uint64_t mask = end - start;
-   uint64_t check_indexes = mask & result;
-
-   if (check_indexes != 0) { // set any one of the tags
-      tag = tag & value;
-      uint8_t bit_index = __builtin_ctzll(check_indexes);
-      filter->blocks[index].tags[bit_index + sizeof(__uint128_t)] = tag;
-      return true;
-   } else
-      return false;
-}
-
-bool vqf_set_tx(vqf_filter * restrict filter, uint64_t hash, uint8_t value) {
-   unsigned status = _XABORT_EXPLICIT;
-   while ((status = _xbegin()) != _XBEGIN_STARTED) {}
-   vqf_set_tx(filter, hash, value);
-   _xend();
-}
-
-bool vqf_set(vqf_filter * restrict filter, uint64_t hash, uint8_t value) {
-   vqf_metadata * restrict metadata           = &filter->metadata;
-   //vqf_block    * restrict blocks             = filter->blocks;
-   uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
-   uint64_t                 range              = metadata->range;
-
-   uint64_t block_index = hash >> key_remainder_bits;
-   //__uint128_t block_md = blocks[block_index         / QUQU_BUCKETS_PER_BLOCK].md;
-   uint64_t tag = hash & 0xff;
-   //uint64_t block_free     =	get_block_free_space(block_md);
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
-
-   __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
-
-   //if (block_free < QUQU_CHECK_ALT) {
-   return set_tags(filter, tag, block_index, value) || set_tags(filter,
-         tag,
-         alt_block_index,
-         value);
-   // } else {
-   //    return check_tags(filter, tag, block_index); 
-   //}
-
-}
-
-#endif

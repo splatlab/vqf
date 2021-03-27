@@ -20,27 +20,27 @@
 #include "vqf_filter.h"
 
 uint64_t tv2usec(struct timeval *tv) {
-  return 1000000 * tv->tv_sec + tv->tv_usec;
+   return 1000000 * tv->tv_sec + tv->tv_usec;
 }
 
 /* Print elapsed time using the start and end timeval */
 void print_time_elapsed(const char* desc, struct timeval* start, struct
-												timeval* end, uint64_t ops, const char *opname)
+      timeval* end, uint64_t ops, const char *opname)
 {
-  uint64_t elapsed_usecs = tv2usec(end) - tv2usec(start);
-	printf("%s Total Time Elapsed: %f seconds", desc, 1.0*elapsed_usecs / 1000000);
-  if (ops) {
-    printf(" (%f nanoseconds/%s)", 1000.0 * elapsed_usecs / ops, opname);
-  }
-  printf("\n");
+   uint64_t elapsed_usecs = tv2usec(end) - tv2usec(start);
+   printf("%s Total Time Elapsed: %f seconds", desc, 1.0*elapsed_usecs / 1000000);
+   if (ops) {
+      printf(" (%f nanoseconds/%s)", 1000.0 * elapsed_usecs / ops, opname);
+   }
+   printf("\n");
 }
 
 
 typedef struct args {
-	vqf_filter *cf;
-	uint64_t *vals;
-	uint64_t start;
-	uint64_t end;
+   vqf_filter *cf;
+   uint64_t *vals;
+   uint64_t start;
+   uint64_t end;
 } args;
 
 void *insert_bm(void *arg)
@@ -91,59 +91,59 @@ void multi_threaded_insertion(args args[], int tcnt)
 
 int main(int argc, char **argv)
 {
-	if (argc < 3) {
-		fprintf(stderr, "Please specify three arguments: \n \
+   if (argc < 3) {
+      fprintf(stderr, "Please specify three arguments: \n \
             1. log of the number of slots in the CQF.\n \
             2. number of threads.\n");
-		exit(1);
-	}
-	uint64_t qbits = atoi(argv[1]);
-	uint32_t tcnt = atoi(argv[2]);
-	uint64_t nhashbits = qbits + 8;
-	uint64_t nslots = (1ULL << qbits);
-	uint64_t nvals = 900*nslots/1000;
+      exit(1);
+   }
+   uint64_t qbits = atoi(argv[1]);
+   uint32_t tcnt = atoi(argv[2]);
+   uint64_t nhashbits = qbits + 8;
+   uint64_t nslots = (1ULL << qbits);
+   uint64_t nvals = 85*nslots/100;
 
-	uint64_t *vals;
-        vqf_filter *filter;	
+   uint64_t *vals;
+   vqf_filter *filter;	
 
-	/* initialize vqf filter */
-	if ((filter = vqf_init(nslots)) == NULL) {
-		fprintf(stderr, "Can't allocate vqf filter.");
-		exit(EXIT_FAILURE);
-	}
+   /* initialize vqf filter */
+   if ((filter = vqf_init(nslots)) == NULL) {
+      fprintf(stderr, "Can't allocate vqf filter.");
+      exit(EXIT_FAILURE);
+   }
 
-	/* Generate random values */
-	vals = (uint64_t*)calloc(nvals, sizeof(vals[0]));
-	RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
-	for (uint32_t i = 0; i < nvals; i++) {
-		vals[i] = (1 * vals[i]) % filter->metadata.range;
-	}
-	
-	args *arg = (args*)malloc(tcnt * sizeof(args));
-	for (uint32_t i = 0; i < tcnt; i++) {
-		arg[i].cf = filter;
-		arg[i].vals = vals;
-		arg[i].start = (nvals/tcnt) * i;
-		arg[i].end = (nvals/tcnt) * (i + 1) - 1;
-	}
-	//fprintf(stdout, "Total number of items: %ld\n", arg[tcnt-1].end);
+   /* Generate random values */
+   vals = (uint64_t*)calloc(nvals, sizeof(vals[0]));
+   RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
+   for (uint32_t i = 0; i < nvals; i++) {
+      vals[i] = (1 * vals[i]) % filter->metadata.range;
+   }
 
-	struct timeval start, end;
-	struct timezone tzp;
+   args *arg = (args*)malloc(tcnt * sizeof(args));
+   for (uint32_t i = 0; i < tcnt; i++) {
+      arg[i].cf = filter;
+      arg[i].vals = vals;
+      arg[i].start = (nvals/tcnt) * i;
+      arg[i].end = (nvals/tcnt) * (i + 1) - 1;
+   }
+   //fprintf(stdout, "Total number of items: %ld\n", arg[tcnt-1].end);
 
-	gettimeofday(&start, &tzp);
-	multi_threaded_insertion(arg, tcnt);
-	gettimeofday(&end, &tzp);
-	print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
-	
-	//fprintf(stdout, "Inserted all items: %ld\n", arg[tcnt-1].end);
+   struct timeval start, end;
+   struct timezone tzp;
 
-	for (uint64_t i = 0; i < arg[tcnt-1].end; i++) {
-           if (!vqf_is_present(filter, vals[i])) {
-              fprintf(stderr, "Lookup failed for %ld", vals[i]);
-              exit(EXIT_FAILURE);
-           }
-	}
+   gettimeofday(&start, &tzp);
+   multi_threaded_insertion(arg, tcnt);
+   gettimeofday(&end, &tzp);
+   print_time_elapsed("Insertion time", &start, &end, nvals, "insert");
 
-	return 0;
+   //fprintf(stdout, "Inserted all items: %ld\n", arg[tcnt-1].end);
+
+   for (uint64_t i = 0; i < arg[tcnt-1].end; i++) {
+      if (!vqf_is_present(filter, vals[i])) {
+         fprintf(stderr, "Lookup failed for %ld", vals[i]);
+         exit(EXIT_FAILURE);
+      }
+   }
+
+   return 0;
 }

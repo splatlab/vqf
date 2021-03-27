@@ -25,19 +25,19 @@
 #define ITR 100000000 
 
 uint64_t tv2usec(struct timeval *tv) {
-  return 1000000 * tv->tv_sec + tv->tv_usec;
+   return 1000000 * tv->tv_sec + tv->tv_usec;
 }
 
 /* Print elapsed time using the start and end timeval */
 void print_time_elapsed(const char* desc, struct timeval* start, struct
-												timeval* end, uint64_t ops, const char *opname)
+      timeval* end, uint64_t ops, const char *opname)
 {
-  uint64_t elapsed_usecs = tv2usec(end) - tv2usec(start);
-	printf("%s Total Time Elapsed: %f seconds", desc, 1.0*elapsed_usecs / 1000000);
-  if (ops) {
-    printf(" (%f nanoseconds/%s)", 1000.0 * elapsed_usecs / ops, opname);
-  }
-  printf("\n");
+   uint64_t elapsed_usecs = tv2usec(end) - tv2usec(start);
+   printf("%s Total Time Elapsed: %f seconds", desc, 1.0*elapsed_usecs / 1000000);
+   if (ops) {
+      printf(" (%f nanoseconds/%s)", 1000.0 * elapsed_usecs / ops, opname);
+   }
+   printf("\n");
 }
 
 int main(int argc, char **argv)
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
    }
    uint64_t qbits = atoi(argv[1]);
    uint64_t nslots = (1ULL << qbits);
-   uint64_t nvals = 90*nslots/100;
+   uint64_t nvals = 85*nslots/100;
    uint64_t *vals;
    uint64_t *other_vals;
 
@@ -69,11 +69,6 @@ int main(int argc, char **argv)
       vals[i] = (1 * vals[i]) % filter->metadata.range;
       other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
    }
-
-   //srand(0);
-   //for (uint32_t i = 0; i < nvals; i++) {
-   //   vals[i] = (rand() % filter->metadata.range);
-   //}
 
    struct timeval start, end;
    struct timezone tzp;
