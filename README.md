@@ -22,7 +22,7 @@ Overview
  items in a data set. The VQF is based on Robin Hood hashing, like the quotient
  filter, but uses power-of-two-choices hashing to reduce the variance of 
  runs, and thus offers consistent, high throughput across load factors.
- Power-of-two-choices hashing also makes it more amenable to concurrent updates,
+ Power-of-two-choices hashing also makes it more amenable to concurrent updates.
 
 API
 --------
