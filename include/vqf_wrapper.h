@@ -47,7 +47,8 @@ inline int q_remove(__uint128_t val)
 
 inline __uint128_t q_range()
 {
-	return q_filter->metadata.range;
+	//return q_filter->metadata.range;
+	return UINT64_MAX;
 }
 
 inline int q_destroy()

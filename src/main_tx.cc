@@ -116,7 +116,8 @@ int main(int argc, char **argv)
    vals = (uint64_t*)calloc(nvals, sizeof(vals[0]));
    RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
    for (uint32_t i = 0; i < nvals; i++) {
-      vals[i] = (1 * vals[i]) % filter->metadata.range;
+      vals[i] = (1 * vals[i]);
+      //vals[i] = (1 * vals[i]) % filter->metadata.range;
    }
 
    args *arg = (args*)malloc(tcnt * sizeof(args));

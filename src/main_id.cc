@@ -66,8 +66,10 @@ int main(int argc, char **argv)
    other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
    RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
    for (uint64_t i = 0; i < nvals; i++) {
-      vals[i] = (1 * vals[i]) % filter->metadata.range;
-      other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+      vals[i] = (1 * vals[i]);
+      other_vals[i] = (1 * other_vals[i]);
+      //vals[i] = (1 * vals[i]) % filter->metadata.range;
+      //other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
    }
 
    struct timeval start, end;
