@@ -71,11 +71,13 @@ int main(int argc, char **argv)
    other_vals = (uint64_t*)malloc(nvals*sizeof(other_vals[0]));
    RAND_bytes((unsigned char *)vals, sizeof(*vals) * nvals);
    for (uint64_t i = 0; i < nvals; i++) {
-      vals[i] = (1 * vals[i]) % filter->metadata.range;
+      vals[i] = (1 * vals[i]);
+      //vals[i] = (1 * rand()) % filter->metadata.range;
    }
    RAND_bytes((unsigned char *)other_vals, sizeof(*other_vals) * nvals);
    for (uint64_t i = 0; i < nvals; i++) {
-      other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
+      other_vals[i] = (1 * other_vals[i]);
+      //other_vals[i] = (1 * other_vals[i]) % filter->metadata.range;
    }
 
    struct timeval start, end;
@@ -85,7 +87,7 @@ int main(int argc, char **argv)
    /* Insert hashes in the vqf filter */
    for (uint64_t i = 0; i < nvals; i++) {
       if (!vqf_insert(filter, vals[i])) {
-         fprintf(stderr, "Insertion failed");
+         fprintf(stderr, "Insertion failed. LF: %f\n", i/(nslots*1.0));
          exit(EXIT_FAILURE);
       }
    }
@@ -94,7 +96,7 @@ int main(int argc, char **argv)
    gettimeofday(&start, &tzp);
    for (uint64_t i = 0; i < nvals; i++) {
       if (!vqf_is_present(filter, vals[i])) {
-         fprintf(stderr, "Lookup failed for %ld", vals[i]);
+         fprintf(stderr, "Lookup failed for %ld index: %ld\n", vals[i], i);
          exit(EXIT_FAILURE);
       }
    }
@@ -117,7 +119,10 @@ int main(int argc, char **argv)
 
    gettimeofday(&start, &tzp);
    for (uint64_t i = 0; i < nvals; i++) {
-      vqf_remove(filter, vals[i]);
+      if (!vqf_remove(filter, vals[i])) {
+         fprintf(stderr, "Remove failed for %ld and index %ld\n", vals[i], i);
+         exit(EXIT_FAILURE);
+      }
    }
    gettimeofday(&end, &tzp);
    print_time_elapsed("Remove time", &start, &end, nvals, "remove");

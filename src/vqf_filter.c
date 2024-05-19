@@ -346,9 +346,11 @@ vqf_filter * vqf_init(uint64_t nslots) {
 #elif TAG_BITS == 16
    filter->metadata.key_remainder_bits = 16;
 #endif
-   filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
+   filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK;
+   //filter->metadata.range = total_blocks * QUQU_BUCKETS_PER_BLOCK * (1ULL << filter->metadata.key_remainder_bits);
    filter->metadata.nblocks = total_blocks;
    filter->metadata.nelts = 0;
+   //printf("Range: %ld\n", filter->metadata.range);
 
    // memset to 1
 #if TAG_BITS == 8
@@ -368,6 +370,10 @@ vqf_filter * vqf_init(uint64_t nslots) {
    return filter;
 }
 
+uint64_t alt_index(uint64_t index, uint64_t tag, uint64_t range) {
+  return (uint64_t)(range - index + (tag * 0x5bd1e995)) % range;
+}
+
 // If the item goes in the i'th slot (starting from 0) in the block then
 // find the i'th 0 in the metadata, insert a 1 after that and shift the rest
 // by 1 bit.
@@ -378,7 +384,7 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
    uint64_t                 range              = metadata->range;
 
-   uint64_t block_index = hash >> key_remainder_bits;
+   uint64_t block_index = hash % range;
    lock(blocks[block_index/QUQU_BUCKETS_PER_BLOCK]);
 #if TAG_BITS == 8
    uint64_t *block_md = blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
@@ -387,8 +393,11 @@ bool vqf_insert(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t *block_md = &blocks[block_index/QUQU_BUCKETS_PER_BLOCK].md;
    uint64_t block_free = get_block_free_space(*block_md);
 #endif
-   uint64_t tag = hash & TAG_MASK;
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+   uint64_t tag = (hash >> 32) & TAG_MASK; tag += (tag == 0);
+   uint64_t alt_block_index = alt_index(block_index, tag, range);
+
+   //printf("Insertion: Hash: %llu Tag: %ld Prm: %ld Alt: %ld\n", hash, tag, block_index, alt_block_index);
+   //assert(alt_index(alt_block_index, tag, range) == block_index);
 
    __builtin_prefetch(&blocks[alt_block_index/QUQU_BUCKETS_PER_BLOCK]);
 
@@ -524,9 +533,11 @@ bool vqf_remove(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
    uint64_t                 range              = metadata->range;
 
-   uint64_t block_index = hash >> key_remainder_bits;
-   uint64_t tag = hash & TAG_MASK;
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+   uint64_t block_index = hash % range;
+   uint64_t tag = (hash >> 32) & TAG_MASK; tag += (tag == 0);
+   uint64_t alt_block_index = alt_index(block_index, tag, range);
+   //uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range);
+   //printf("Removal: Hash: %llu Tag: %ld Prm: %ld Alt: %ld\n", hash, tag, block_index, alt_block_index);
 
    __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
@@ -605,9 +616,11 @@ bool vqf_is_present(vqf_filter * restrict filter, uint64_t hash) {
    uint64_t                 key_remainder_bits = metadata->key_remainder_bits;
    uint64_t                 range              = metadata->range;
 
-   uint64_t block_index = hash >> key_remainder_bits;
-   uint64_t tag = hash & TAG_MASK;
-   uint64_t alt_block_index = ((hash ^ (tag * 0x5bd1e995)) % range) >> key_remainder_bits;
+   uint64_t block_index = hash % range;
+   uint64_t tag = (hash >> 32) & TAG_MASK; tag += (tag == 0);
+   //uint64_t alt_block_index = ((block_index ^ (tag * 0x5bd1e995)) % range);
+   uint64_t alt_block_index = alt_index(block_index, tag, range);
+   //printf("Query: Hash: %llu Tag: %ld Prm: %ld Alt: %ld\n", hash, tag, block_index, alt_block_index);
 
    __builtin_prefetch(&filter->blocks[alt_block_index / QUQU_BUCKETS_PER_BLOCK]);
 
